@@ -2,8 +2,7 @@
 #include <math.h>
 
 // constructor
-Simulator::Simulator(float _gain, float _m, float _b, int _R1, float _C1, float _VCC) {
-    gain = _gain;
+Simulator::Simulator(float _m, float _b, int _R1, float _C1, float _VCC) {
     m = _m;
     b = _b;
     R1 = _R1;

@@ -9,7 +9,7 @@ class Simulator {
         float C1;
         float VCC;
     public:
-        Simulator(float _gain, float _m, float _b, int _R1, float _C1, float _VCC);
+        Simulator(float _m, float _b, int _R1, float _C1, float _VCC);
         float calc_R2 (float lux);
         float calc_Req (float lux);
         float calc_tau (float lux);

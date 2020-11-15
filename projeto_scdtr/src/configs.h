@@ -2,6 +2,9 @@
 #define _CONFIGS_H_
 
 #include <Arduino.h>
+
+#define SERIAL_INPUT_SIZE 15
+
 const int LED_PIN = 3;
 const int LUX_PIN = A0;
 const int VCC = 5;
@@ -16,5 +19,6 @@ const float error_margin = 0.02;
 
 const int pwm_array[] = {0, 15, 0, 30, 0, 45, 0, 60, 0, 75, 0, 90, 0, 105, 0, 120, 0, 135, 0, 150, 0, 165, 0, 180, 0, 195, 0, 210, 0, 225, 0, 240, 0, 255};
 const unsigned long sampInterval = 10000; //microseconds 100Hz
+
 
 #endif
