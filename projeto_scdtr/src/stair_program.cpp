@@ -10,7 +10,8 @@ float get_lux ();
 
 void setup() {
   pinMode(LED_PIN, OUTPUT);
-  TCCR2B = TCCR2B & B11111000 | B00000010; // for PWM frequency of 3921.16 Hz
+  //TCCR2B = TCCR2B & B11111000 | B00000010; // for PWM frequency of 3921.16 Hz
+  TCCR2B = TCCR2B & B11111000 | B00000001;    // set timer 2 divisor to     1 for PWM frequency of 31372.55 Hz
   Serial.begin(115200);
 }
 
