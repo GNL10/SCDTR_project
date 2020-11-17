@@ -34,7 +34,7 @@ void loop() {
   Serial.print(", ");
 
 
-  delay(300);
+  delay(400);
   Serial.print(float(analogRead(LUX_PIN)*5)/1023);
   Serial.print(", ");
   Serial.println(get_lux());

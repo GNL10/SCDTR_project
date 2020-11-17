@@ -16,10 +16,13 @@ int read_lux = 0;
 char serial_input[SERIAL_INPUT_SIZE+1];
 int serial_input_index = 0;
 
+float new_gain;
+float new_b;
+
 float v_i = 0;
 unsigned long t_i = 0;
 
-int u_ff = 0;
+float u_ff = 0;
 float x_ref = 0;
 
 bool occupancy = false;
@@ -35,7 +38,7 @@ ISR(TIMER1_COMPA_vect);
 int serial_read_lux ();
 void process_serial_input_command();
 float get_lux ();
-float calc_gain ();
+void calc_gain ();
 float get_voltage();
 
 
@@ -45,9 +48,9 @@ void setup() {
   TCCR2B = TCCR2B & B11111000 | B00000001;    // set timer 2 divisor to     1 for PWM frequency of 31372.55 Hz
   pinMode(LED_PIN, OUTPUT);
 
-  gain = calc_gain();
+  calc_gain();
   Serial.print("\n\nGain [lux/dc]: ");
-  Serial.println(gain);
+  Serial.println(new_gain);
   sim = new Simulator(m, b, R1, C1, VCC);
   ctrl = new Controller(error_margin, true, K1, K2);
 
@@ -77,7 +80,8 @@ void loop() {
     if(serial_read_lux()){ // command is ready to be processed
       process_serial_input_command();
       x_ref = (occupancy == true) ? occupied_lux : unoccupied_lux; // decides x_ref, depending if it is occupied or not
-      u_ff = (int) (x_ref/gain);
+      u_ff = (x_ref == 0) ? 0 : (x_ref - new_b)/new_gain; //if x_ref = 0, u_ff = 0
+      u_ff = round(u_ff);
       t_i = micros();
       v_i = get_voltage();
     }
@@ -86,9 +90,20 @@ void loop() {
     float y_ref = sim->calc_LDR_voltage(x_ref, v_i, t_i, t);
     float y = get_voltage();
     float debug;
-    int u_sat = ctrl->run_controller(y, y_ref, u_ff, &debug);
-    analogWrite(LED_PIN, u_sat);
+    analogWrite(LED_PIN, u_ff);
+    Serial.print(t);
+    Serial.print(", ");
+    Serial.print(u_ff);
+    Serial.print(", ");
+    Serial.print(y);
+    Serial.print(", ");
+    Serial.print(y_ref);
+    Serial.print(", ");
+    Serial.println(get_lux());
+    //int u_sat = ctrl->run_controller(y, y_ref, u_ff, &debug);
+    //analogWrite(LED_PIN, u_sat);
 
+/*
     Serial.print(t);
     Serial.print(", ");
     Serial.print(x_ref);
@@ -108,7 +123,7 @@ void loop() {
     Serial.print(get_lux());
     
     Serial.println();
-
+*/
     unsigned long endTime = micros();
     unsigned long elapsedTime = endTime - t;
     if(elapsedTime > sampInterval)
@@ -175,12 +190,50 @@ float get_voltage() {
   return float(analogRead(LUX_PIN)*VCC)/1023;
 }
 
-float calc_gain () {
+void calc_gain () {
   int max_pwm = 255;
   analogWrite(LED_PIN, max_pwm);
   delay(400);
   float max_lux = get_lux();
+
+
+
+  
+  analogWrite(LED_PIN, 25);
+  delay(400);
+  Serial.print("down gain : ");
+  Serial.println(get_lux()/25);
+  
+  analogWrite(LED_PIN, 50);
+  delay(400);
+  Serial.print("down gain : ");
+  Serial.println(get_lux()/50);
+
+  analogWrite(LED_PIN, 100);
+  delay(400);
+  Serial.print("down gain : ");
+  Serial.println(get_lux()/100);
+  
+  analogWrite(LED_PIN, 150);
+  delay(400);
+  Serial.print("down gain : ");
+  Serial.println(get_lux()/150);
+  
+  analogWrite(LED_PIN, 6);
+  delay(1000);
+  float lux_5 = get_lux();
+  new_gain = (max_lux - lux_5) / (max_pwm-6);
+  Serial.print("lux at pwm 255: ");
+  Serial.println(max_lux);
+  Serial.print("lux at pwm 6: ");
+  Serial.println(lux_5);
+  Serial.print("new gain : ");
+  Serial.println(new_gain);
+  new_b = lux_5 - new_gain*6;
+  Serial.print("b : ");
+  Serial.println(new_b);
+  
+  
   analogWrite(LED_PIN, 0);
   delay(400);
-  return max_lux/max_pwm;
 }

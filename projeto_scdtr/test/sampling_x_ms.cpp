@@ -12,7 +12,7 @@ float gain = 0;
 float v_i = 0;
 float t_i = 0;
 
-unsigned long samplingInterval = 1700; // 1ms
+unsigned long samplingInterval = 4000;
 
 int serial_read_pwm ();
 float get_lux ();
@@ -25,10 +25,10 @@ void setup() {
   Serial.begin(115200);
   TCCR2B = TCCR2B & B11111000 | B00000010; // for PWM frequency of 3921.16 Hz
   pinMode(LED_PIN, OUTPUT);
-  //gain = calc_gain();
+  gain = calc_gain();
   //Serial.print("Gain [lux/dc]: ");
   //Serial.println(gain);
-  //sim = new Simulator(m, b, R1, C1, VCC);
+  sim = new Simulator(m, b, R1, C1, VCC);
 }
 
 
@@ -42,17 +42,20 @@ void loop() {
     if(pwm_pos==sizeof(pwm_array)/sizeof(*pwm_array))
       pwm_pos = 0;
     analogWrite(LED_PIN, pwm_array[pwm_pos]);
+    t_i = micros();
+    v_i = get_voltage();
   }
   unsigned long t = micros();
-  //float lux = sim->calc_LUX_at_LDR(pwm_array[pwm_pos]);
+  float y_ref = sim->calc_LDR_voltage(x_ref, v_i, t_i, t);
+  float lux = sim->calc_LUX_at_LDR(pwm_array[pwm_pos]);
   
   Serial.print(t);
   Serial.print(", ");
   Serial.println(pwm_array[pwm_pos]);
-  //Serial.print(", ");
-  //Serial.println(float(analogRead(LUX_PIN)*5)/1023);
-  //Serial.print(", ");
-  //Serial.println(sim->calc_LDR_voltage(lux, v_i, t_i, t));
+  Serial.print(", ");
+  Serial.println(float(analogRead(LUX_PIN)*5)/1023);
+  Serial.print(", ");
+  Serial.println(sim->calc_LDR_voltage(lux, v_i, t_i, t));
   
   //Serial.println(get_lux());
 
