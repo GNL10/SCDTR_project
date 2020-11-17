@@ -32,7 +32,6 @@ void setup() {
   TCCR2B = TCCR2B & B11111000 | B00000001;    // set timer 2 divisor to     1 for PWM frequency of 31372.55 Hz
   pinMode(LED_PIN, OUTPUT);
   delay(1000);
-  Serial.println("START:");
   //gain = calc_gain();
   //Serial.print("Gain [lux/dc]: ");
   //Serial.println(gain);

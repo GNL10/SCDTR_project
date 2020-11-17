@@ -6,6 +6,8 @@
 
 //  /home/gnl/.platformio/penv/bin/pio device monitor --baud 115200
 
+const unsigned long sampInterval = 10000; //microseconds 100Hz
+
 int counter = 0;
 int pwm_pos = 0;
 float gain = 0;
@@ -21,8 +23,8 @@ int u_ff = 0;
 float x_ref = 0;
 
 bool occupancy = false;
-float occupied_lux = 400;
-float unoccupied_lux = 200;
+float occupied_lux = 50;
+float unoccupied_lux = 20;
 
 Simulator* sim;
 Controller* ctrl;
