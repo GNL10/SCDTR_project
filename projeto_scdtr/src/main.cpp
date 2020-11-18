@@ -55,7 +55,9 @@ void setup() {
   Serial.print("\n\nGain [lux/dc]: ");
   Serial.println(static_gain);
   sim = new Simulator(m, b, R1, C1, VCC);
-  ctrl = new Controller(error_margin, true, K1, K2);
+  Serial.print("K1 before controller : ");
+  Serial.println(K1);
+  ctrl = new Controller(error_margin, K1, K2, true);
 
   cli(); //disable interrupts
   TCCR1A = 0; // clear register
@@ -108,7 +110,7 @@ void loop() {
     float y_ref = sim->calc_LDR_lux(x_ref, v_i, t_i, t);
     float y = get_lux();
 
-    float debug[3];
+    float debug[4];
 
     int u_sat = ctrl->run_controller(y, y_ref, u_ff, debug);
     analogWrite(LED_PIN, u_sat);
@@ -120,6 +122,8 @@ void loop() {
     Serial.print(y_ref);
     Serial.print(", ");
     Serial.print(y);
+    Serial.print(", ");
+    Serial.print(debug[3]);
     Serial.print(", ");
     Serial.print(debug[0]);
     Serial.print(", ");

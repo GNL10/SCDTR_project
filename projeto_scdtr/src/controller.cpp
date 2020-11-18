@@ -51,6 +51,7 @@ int Controller::run_controller(float y, float y_ref, float u_ff, float *u_out) {
   u_out[0] = K1*e;
   u_out[1] = i_ant + K2*(e + e_ant);
   u_out[2] = u_out[0] + u_out[1];
+  u_out[3] = e;
   float u_fb = proportional_integrator(e);
   int u = u_fb + u_ff;
   

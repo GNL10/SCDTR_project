@@ -13,7 +13,7 @@ const float C1 = 0.0000022; //0.000001; // [uF]
 const float m = -0.793; //-0.650515;
 const float b = 5.1;    //4.778;
 const float TETA = 0.00005; //50us
-const float K1 = 0.001;  
+const float K1 = 0.2;  
 const float K2 = 0.1;
 const float error_margin = 0.20;
 
