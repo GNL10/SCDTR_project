@@ -78,22 +78,22 @@ void setup() {
 
 void loop() {
   if (flag) {
-    unsigned long t = micros();
+    unsigned long init_t = micros();
 
     if(serial_read_lux()){ // command is ready to be processed
       process_serial_input_command();
       x_ref = (occupancy == true) ? occupied_lux : unoccupied_lux; // decides x_ref, depending if it is occupied or not
       u_ff = (x_ref == 0) ? 0 : (x_ref - static_b)/static_gain; //if x_ref = 0, u_ff = 0
-      u_ff = round(u_ff);
       t_i = micros();
       v_i = get_voltage();
     }
     
+    unsigned long t = micros();
     
+    /* for simulation results
     float y_ref = sim->calc_LDR_voltage(x_ref, v_i, t_i, t);
     float y = get_voltage();
-    float debug;
-    
+    u_ff = round(u_ff);
     analogWrite(LED_PIN, u_ff);
     Serial.print(t);
     Serial.print(", ");
@@ -103,11 +103,16 @@ void loop() {
     Serial.print(", ");
     Serial.print(y_ref);
     Serial.print(", ");
-    Serial.println(get_lux());
-    //int u_sat = ctrl->run_controller(y, y_ref, u_ff, &debug);
-    //analogWrite(LED_PIN, u_sat);
+    Serial.println(get_lux());*/
 
-/*
+    float y_ref = sim->calc_LDR_lux(x_ref, v_i, t_i, t);
+    float y = get_lux();
+
+    float debug[3];
+
+    int u_sat = ctrl->run_controller(y, y_ref, u_ff, debug);
+    analogWrite(LED_PIN, u_sat);
+
     Serial.print(t);
     Serial.print(", ");
     Serial.print(x_ref);
@@ -116,20 +121,22 @@ void loop() {
     Serial.print(", ");
     Serial.print(y);
     Serial.print(", ");
-    Serial.print(u_ff);
+    Serial.print(debug[0]);
     Serial.print(", ");
-    Serial.print(debug);
+    Serial.print(debug[1]);
+    Serial.print(", ");
+    Serial.print(debug[2]);
+    Serial.print(", ");
+    Serial.print(u_ff);
     Serial.print(", ");
     Serial.print(u_sat);
     Serial.print(", ");
     Serial.print(get_voltage());
-    Serial.print(", ");
-    Serial.print(get_lux());
-    
+
     Serial.println();
-*/
+
     unsigned long endTime = micros();
-    unsigned long elapsedTime = endTime - t;
+    unsigned long elapsedTime = endTime - init_t;
     if(elapsedTime > sampInterval)
         Serial.println("ERROR: Sampling period was exceeded!");
     flag = 0;
