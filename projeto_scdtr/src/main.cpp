@@ -11,11 +11,6 @@
 
 const unsigned long sampInterval = 10000; //microseconds 100Hz
 
-int counter = 0;
-int pwm_pos = 0;
-float gain = 0;
-int read_lux = 0;
-
 char serial_input[SERIAL_INPUT_SIZE+1];
 int serial_input_index = 0;
 
@@ -40,23 +35,22 @@ volatile bool flag;
 ISR(TIMER1_COMPA_vect);
 int serial_read_lux ();
 void process_serial_input_command();
-float get_lux ();
+float calc_lux (float V_AD);
 void calc_gain ();
 float get_voltage();
 
 
-
 void setup() {
   Serial.begin(115200);
-  TCCR2B = TCCR2B & B11111000 | B00000001;    // set timer 2 divisor to     1 for PWM frequency of 31372.55 Hz
+
+  // set timer 2 divisor to     1 for PWM frequency of 31372.55 Hz
+  TCCR2B = TCCR2B & B11111000 | B00000001;
   pinMode(LED_PIN, OUTPUT);
 
   calc_gain();
   Serial.print("\n\nGain [lux/dc]: ");
   Serial.println(static_gain);
   sim = new Simulator(m, b, R1, C1, VCC);
-  Serial.print("K1 before controller : ");
-  Serial.println(K1);
   ctrl = new Controller(error_margin, K1, K2, true);
 
   cli(); //disable interrupts
@@ -92,7 +86,8 @@ void loop() {
     
     unsigned long t = micros();
     
-    /* for simulation results
+    // for simulation results
+    /*
     float y_ref = sim->calc_LDR_voltage(x_ref, v_i, t_i, t);
     float y = get_voltage();
     u_ff = round(u_ff);
@@ -105,10 +100,11 @@ void loop() {
     Serial.print(", ");
     Serial.print(y_ref);
     Serial.print(", ");
-    Serial.println(get_lux());*/
+    Serial.println(calc_lux(get_voltage()));
+    /**/
 
     float y_ref = sim->calc_LDR_lux(x_ref, v_i, t_i, t);
-    float y = get_lux();
+    float y = calc_lux(get_voltage());
 
     float debug[4];
 
@@ -148,14 +144,18 @@ void loop() {
 }
 
 
-
+/**
+ * Interruption
+ * Activates the flag that is used to run the loop
+ */
 ISR(TIMER1_COMPA_vect){
   flag = 1; //notify main loop
 }
 
-// reads 1 char from serial and concatenates it into the string serial_input
-// returns 1 when the enter key is pressed
-// else returns 0
+/**
+ * reads 1 char from serial and concatenates it into the string serial_input
+ * @returns 1 when the enter key is pressed else 0
+ */
 int serial_read_lux () {
   if (Serial.available()) {
     char read_byte = Serial.read();
@@ -164,12 +164,14 @@ int serial_read_lux () {
       return 1;
     }
     serial_input[serial_input_index++] = read_byte;
-
   }
   return 0;
 }
 
-
+/**
+ * Processes the command entered in the serial_input variable
+ * Changes occupancy and lower bound values according to command
+ */
 void process_serial_input_command () {
   serial_input_index = 0;
   char* command = strtok(serial_input, " ");
@@ -192,32 +194,44 @@ void process_serial_input_command () {
 
 }
 
-
-//Gets the voltage value from the analog input and returns the lux value
-float get_lux () {
-  float V_AD = float(analogRead(LUX_PIN)*5)/1023;
+/**
+ * Calculates the lux value from a voltage value
+ * @param V_AD Voltage at LDR
+ * @returns Lux value at LDR
+ */
+float calc_lux (float V_AD) {
   float R_lux = (R1/V_AD)*VCC - R1; 
   return pow(10, (log10(R_lux)-b)/m);
 }
 
+/**
+ * Reads the value from LUX_PIN and converts it to volts
+ * @returns voltage at LDR
+ */
 float get_voltage() {
   return float(analogRead(LUX_PIN)*VCC)/1023;
 }
 
+/**
+ * Calculates the gain [lux / duty cycle] of the system
+ * @returns Gain [lux / duty cycle] to the static_gain global variable
+ */
 void calc_gain () {
   int max_pwm = 255;
-  int min_pwm = 6;
+  
 
   analogWrite(LED_PIN, max_pwm);
   delay(5000);
-  float max_lux = get_lux();  
+  float max_lux = calc_lux(get_voltage());  
   
-  /*analogWrite(LED_PIN, min_pwm);
+  /*
+  int min_pwm = 6;
+  analogWrite(LED_PIN, min_pwm);
   delay(1000);
-  float min_lux = get_lux();
+  float min_lux = calc_lux(get_voltage());
   static_gain = (max_lux - min_lux) / (max_pwm-min_pwm);
   static_b = min_lux - static_gain*min_pwm;  
-  */
+  /**/
 
   static_gain = max_lux/max_pwm;
   Serial.println(max_lux);

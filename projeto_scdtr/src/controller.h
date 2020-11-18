@@ -15,7 +15,7 @@ class Controller {
         float calc_error (float y, float y_ref);
         float apply_error_margins (float e);
         int apply_pwm_limits(int pwm);
-        float anti_windup (int u_sat, int u);
+        bool anti_windup (int u_sat, int u);
         float proportional_integrator (float e);
         int run_controller(float y, float y_ref, float u_ff, float *u_out);
 };
