@@ -48,11 +48,10 @@ float Simulator::calc_tau (float lux) {
  * @param t current time
  * @returns Theoretical current voltage value
  */
-float Simulator::calc_LDR_voltage(float lux, float v_i, float t_i, float t, float *debug) {
+float Simulator::calc_LDR_voltage(float lux, float v_i, float t_i, float t) {
     float v_f = VCC*R1/(R1+calc_R2(lux));
     t_i/=1000;
     t/=1000;
-    *debug = -(t-t_i);
     return v_f - (v_f - v_i)*exp(-(t-t_i)/(calc_tau(lux)));
 }
 
@@ -65,8 +64,7 @@ float Simulator::calc_LDR_voltage(float lux, float v_i, float t_i, float t, floa
  * @returns Theoretical current lux value
  */
 float Simulator::calc_LDR_lux(float lux, float v_i, float t_i, float t) {
-    float trash;
-    float v = calc_LDR_voltage(lux, v_i, t_i, t, &trash);
+    float v = calc_LDR_voltage(lux, v_i, t_i, t);
     float R_lux = (R1/v)*VCC - R1;
     return pow(10, (log10(R_lux)-b)/m);
 }

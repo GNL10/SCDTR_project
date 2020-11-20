@@ -13,7 +13,7 @@ class Simulator {
         float calc_R2 (float lux);
         float calc_Req (float lux);
         float calc_tau (float lux);
-        float calc_LDR_voltage(float lux, float v_i, float t_i, float t, float *debug);
+        float calc_LDR_voltage(float lux, float v_i, float t_i, float t);
         float calc_LDR_lux(float lux, float v_i, float t_i, float t);
 };
 

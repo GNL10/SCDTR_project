@@ -108,9 +108,7 @@ void loop() {
     float y_ref = sim->calc_LDR_lux(x_ref, v_i, t_i, t);
     float y = calc_lux(get_voltage());
 
-    float debug[4];
-
-    int u_sat = ctrl->run_controller(y, y_ref, u_ff, debug);
+    int u_sat = ctrl->run_controller(y, y_ref, u_ff);
     analogWrite(LED_PIN, u_sat);
 
     Serial.print(t);
@@ -121,16 +119,8 @@ void loop() {
     Serial.print(", ");
     Serial.print(y);
     Serial.print(", ");
-    /*Serial.print(debug[3]);
-    Serial.print(", ");
-    Serial.print(debug[0]);
-    Serial.print(", ");
-    Serial.print(debug[1]);
-    Serial.print(", ");
-    Serial.print(debug[2]);
-    Serial.print(", ");
     Serial.print(u_ff);
-    Serial.print(", ");*/
+    Serial.print(", ");
     Serial.print(u_sat);
     Serial.print(", ");
     Serial.print(get_voltage());
