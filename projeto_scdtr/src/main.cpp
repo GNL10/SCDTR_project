@@ -88,7 +88,8 @@ void loop() {
     
     // for simulation results
     /*
-    float y_ref = sim->calc_LDR_voltage(x_ref, v_i, t_i, t);
+    float trash;
+    float y_ref = sim->calc_LDR_voltage(x_ref, v_i, t_i, t - TETA*1000000, &trash);
     float y = get_voltage();
     u_ff = round(u_ff);
     analogWrite(LED_PIN, u_ff);
@@ -103,6 +104,7 @@ void loop() {
     Serial.println(calc_lux(get_voltage()));
     /**/
 
+    
     float y_ref = sim->calc_LDR_lux(x_ref, v_i, t_i, t);
     float y = calc_lux(get_voltage());
 
@@ -119,7 +121,7 @@ void loop() {
     Serial.print(", ");
     Serial.print(y);
     Serial.print(", ");
-    Serial.print(debug[3]);
+    /*Serial.print(debug[3]);
     Serial.print(", ");
     Serial.print(debug[0]);
     Serial.print(", ");
@@ -128,13 +130,12 @@ void loop() {
     Serial.print(debug[2]);
     Serial.print(", ");
     Serial.print(u_ff);
-    Serial.print(", ");
+    Serial.print(", ");*/
     Serial.print(u_sat);
     Serial.print(", ");
     Serial.print(get_voltage());
-
     Serial.println();
-
+    /**/
     unsigned long endTime = micros();
     unsigned long elapsedTime = endTime - init_t;
     if(elapsedTime > sampInterval)
