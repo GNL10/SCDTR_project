@@ -111,19 +111,22 @@ void loop() {
     int u_sat = ctrl->run_controller(y, y_ref, u_ff);
     analogWrite(LED_PIN, u_sat);
 
-    Serial.print(t);
-    Serial.print(", ");
-    Serial.print(x_ref);
-    Serial.print(", ");
-    Serial.print(y_ref);
-    Serial.print(", ");
+    
+    //Serial.print(t);
+    //Serial.print(", ");
+    //Serial.print(x_ref);
+    //Serial.print(", ");
+    //Serial.print(y_ref);
+    //Serial.print(", ");
     Serial.print(y);
     Serial.print(", ");
     Serial.print(u_ff);
     Serial.print(", ");
     Serial.print(u_sat);
     Serial.print(", ");
-    Serial.print(get_voltage());
+    Serial.print(y_ref - y);
+    //Serial.print(", ");
+    //Serial.print(get_voltage());
     Serial.println();
     /**/
     unsigned long endTime = micros();
@@ -209,24 +212,18 @@ float get_voltage() {
  */
 void calc_gain () {
   int max_pwm = 255;
-  
 
   analogWrite(LED_PIN, max_pwm);
-  delay(5000);
+  delay(500);
   float max_lux = calc_lux(get_voltage());  
   
-  /*
-  int min_pwm = 6;
+  int min_pwm = 0;
   analogWrite(LED_PIN, min_pwm);
-  delay(1000);
+  delay(500);
   float min_lux = calc_lux(get_voltage());
   static_gain = (max_lux - min_lux) / (max_pwm-min_pwm);
-  static_b = min_lux - static_gain*min_pwm;  
-  /**/
+  static_b = min_lux;
 
-  static_gain = max_lux/max_pwm;
-  Serial.println(max_lux);
-  static_b = 0;  
   analogWrite(LED_PIN, 0);
-  delay(400);
+  delay(300);
 }

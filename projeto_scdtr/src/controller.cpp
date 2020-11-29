@@ -1,4 +1,5 @@
 #include "controller.h"
+#include <Arduino.h>
 
 // constructor
 Controller::Controller(float _error_margin, float _K1, float _K2, bool _err_margins_en = true) {
@@ -66,10 +67,32 @@ bool Controller::anti_windup (int u_sat, int u) {
  * @param e Error to be used in the PI
  * @returns Sum of the integrator + proportional term
  */
-float Controller::proportional_integrator (float e) {
+float Controller::proportional_integrator (float e, float u_ff ) {
   float p = K1*e;
   float i = i_ant + K2*(e + e_ant);
+
   i_ant = (es==true) ? 0 : i; //if there was saturation, reset the integral to 0
+  /*
+  float i_max = U_MAX - u_ff - K1*e; 
+  float i_min = U_MIN - u_ff - K1*e;
+  float e_sat;
+  Serial.print(i_min);
+  Serial.print(", ");
+  if(i + p + u_ff > U_MAX) i = i_max; // i > i_max -> e_sat > 0
+  if(i + p + u_ff < U_MIN) i = i_min; // i < i_min -> e_sat < 0
+  
+  /*while (i > i_max || i < i_min){ 
+  
+    if(i > i_max) e_sat = i - i_max; // i > i_max -> e_sat > 0
+    if(i < i_min) e_sat = i - i_min; // i < i_min -> e_sat < 0
+    
+    i = i - (e_sat*1.0001); //i > i_max: subtract; i < i_min: add
+  }
+  Serial.print(p);
+  Serial.print(", ");
+  Serial.print(i);
+  Serial.print(", ");
+  */
   return p+i;
 }
 
@@ -82,7 +105,7 @@ float Controller::proportional_integrator (float e) {
  */
 int Controller::run_controller(float y, float y_ref, float u_ff) {
   float e = calc_error(y, y_ref);
-  float u_fb = proportional_integrator(e);
+  float u_fb = proportional_integrator(e, u_ff);
   int u = u_fb + u_ff;
   
   int u_sat = apply_pwm_limits(u);

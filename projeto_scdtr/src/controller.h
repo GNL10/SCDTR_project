@@ -1,5 +1,9 @@
 #ifndef _CONTROLLER_H_
 #define _CONTROLLER_H_
+
+#define U_MAX 255
+#define U_MIN 0
+
 class Controller {
     private:
         float error_margin;
@@ -16,7 +20,7 @@ class Controller {
         float apply_error_margins (float e);
         int apply_pwm_limits(int pwm);
         bool anti_windup (int u_sat, int u);
-        float proportional_integrator (float e);
+        float proportional_integrator (float e, float u_ff);
         int run_controller(float y, float y_ref, float u_ff);
 };
 
