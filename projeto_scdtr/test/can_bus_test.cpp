@@ -97,15 +97,6 @@ void setup()
     //mcp2515.setNormalMode();
     // use mcp2515.setLoopbackMode() for local testing
     mcp2515.setLoopbackMode();
-    Serial.print("EEPROM length: ");
-    Serial.println(EEPROM.length());
-
-    //float test = 0.0000015;
-    //EEPROM.put(0, test);
-    float rec = 0.0f;
-    EEPROM.get(0, rec);
-    Serial.print("READ FROM EEPROM: ");
-    Serial.println(rec, 10);
 }
 
 unsigned long counter = 0;

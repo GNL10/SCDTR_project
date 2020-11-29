@@ -1,5 +1,6 @@
 #include <math.h>
 #include <string.h>
+#include <EEPROM.h>
 #include "configs.h"
 #include "simulator.h"
 #include "controller.h"
@@ -7,7 +8,8 @@
 //  /home/gnl/.platformio/penv/bin/pio device monitor --baud 115200
 
 // kp a 0
-//aproximar a funcao do tau !!
+
+float C1, m, b; // variables saved in EEPROM
 
 const unsigned long sampInterval = 10000; //microseconds 100Hz
 
@@ -33,6 +35,7 @@ Controller* ctrl;
 volatile bool flag;
 
 ISR(TIMER1_COMPA_vect);
+void load_EEPROM_vars();
 int serial_read_lux ();
 void process_serial_input_command();
 float calc_lux (float V_AD);
@@ -42,6 +45,7 @@ float get_voltage();
 
 void setup() {
   Serial.begin(115200);
+  load_EEPROM_vars();
 
   // set timer 2 divisor to     1 for PWM frequency of 31372.55 Hz
   TCCR2B = TCCR2B & B11111000 | B00000001;
@@ -144,6 +148,29 @@ void loop() {
  */
 ISR(TIMER1_COMPA_vect){
   flag = 1; //notify main loop
+}
+
+/**
+ * Loads the values from the EEPROM to the variables C1, m and b of the program
+ */
+void load_EEPROM_vars() {
+  int address = 0;
+  
+  EEPROM.get(address, C1);
+  address += sizeof(C1);
+  EEPROM.get(address, m);
+  address += sizeof(m);
+  EEPROM.get(address, b);
+  address += sizeof(b);
+
+  Serial.println();
+  Serial.println("### EEPROM VALUES ###");
+  Serial.print("C1 : ");
+  Serial.println(C1, 7);
+  Serial.print("m : ");
+  Serial.println(m, 7);
+  Serial.print("b : ");
+  Serial.println(b, 7);
 }
 
 /**
