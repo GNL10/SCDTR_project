@@ -71,13 +71,12 @@ float Controller::proportional_integrator (float e, float u_ff ) {
   float p = K1*e;
   float i = i_ant + K2*(e + e_ant);
 
-  i_ant = (es==true) ? 0 : i; //if there was saturation, reset the integral to 0
-  /*
+  //i_ant = (es==true) ? 0 : i; //if there was saturation, reset the integral to 0
+  
   float i_max = U_MAX - u_ff - K1*e; 
   float i_min = U_MIN - u_ff - K1*e;
   float e_sat;
-  Serial.print(i_min);
-  Serial.print(", ");
+  
   if(i + p + u_ff > U_MAX) i = i_max; // i > i_max -> e_sat > 0
   if(i + p + u_ff < U_MIN) i = i_min; // i < i_min -> e_sat < 0
   
@@ -88,11 +87,18 @@ float Controller::proportional_integrator (float e, float u_ff ) {
     
     i = i - (e_sat*1.0001); //i > i_max: subtract; i < i_min: add
   }
+  */
+  Serial.print(i_min);
+  Serial.print(", ");
+  Serial.print(i_max);
+  Serial.print(", ");
   Serial.print(p);
   Serial.print(", ");
   Serial.print(i);
   Serial.print(", ");
-  */
+  Serial.print(p+i);
+  Serial.print(", ");
+  
   return p+i;
 }
 

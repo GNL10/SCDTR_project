@@ -10,8 +10,8 @@ const int LUX_PIN = A0; // Pin connected to LDR
 const int VCC = 5;      // VCC voltage
 const int R1 = 10000;   // R1 resistance
 const float TETA = 0.00005; //50us
-const float K1 = 2.2;//0.2;  // Proportional gain
-const float K2 = 0.29;//0.1;  // Integrator gain
+const float K1 = 1.6;//2.2;//0.2;  // Proportional gain
+const float K2 = 0.5;//0.5;//0.1;  // Integrator gain
 const float error_margin = 0.5;//0.20;    // Margin of error to be ignored
 
 
