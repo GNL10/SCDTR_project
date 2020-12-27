@@ -7,7 +7,7 @@ void setup(){
 
     int address = 0;
 
-    byte id = 1;
+    uint8_t id = 1;
     float C1 = 0.0000015; //0.000001; // Capacitor capacitance[uF]
     float m = -0.793;
     float b = 5.1;

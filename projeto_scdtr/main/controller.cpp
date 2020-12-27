@@ -75,7 +75,7 @@ float Controller::proportional_integrator (float e, float u_ff ) {
   
   float i_max = U_MAX - u_ff - K1*e; 
   float i_min = U_MIN - u_ff - K1*e;
-  float e_sat;
+  //float e_sat;
   
   if(i + p + u_ff > U_MAX) i = i_max; // i > i_max -> e_sat > 0
   if(i + p + u_ff < U_MIN) i = i_min; // i < i_min -> e_sat < 0

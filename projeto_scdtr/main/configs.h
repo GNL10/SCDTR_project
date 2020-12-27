@@ -4,6 +4,7 @@
 #include <Arduino.h>
 
 #define SERIAL_INPUT_SIZE 15
+#define ID_MAX_NUM 64 // uint8 max 255
 
 const int LED_PIN = 3;  // Pin connected to LED
 const int LUX_PIN = A0; // Pin connected to LDR

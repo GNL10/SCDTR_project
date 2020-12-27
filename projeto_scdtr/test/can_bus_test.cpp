@@ -85,8 +85,10 @@ MCP2515::ERROR write(uint32_t id, uint32_t val) {
     frame.can_dlc = 4;
     my_can_msg msg;
     msg.value = val; //pack data
-    for( int i = 0; i < 4; i++ ) //prepare can message
-        frame.data[i] = msg.bytes[i];
+    frame.data[0] = ID;
+    for( int i = 1; i < 4; i++ ) //prepare can message
+        frame.data[i] = msg.bytes[i-1];
+    
     //send data
     return mcp2515.sendMessage(&frame);
 }
@@ -114,7 +116,7 @@ void loop() {
     for( int i = 0; i < 4 ; i++ ) {
         Serial.print( "Sending: " );
         Serial.println( counter );
-        if( write( i, counter++ + ID*10000) != MCP2515::ERROR_OK )
+        if( write( i, counter++) != MCP2515::ERROR_OK )
             Serial.println( "\t\t\t\tMCP2515 TX Buf Full" );
     }
 
@@ -136,11 +138,20 @@ void loop() {
             my_can_msg msg;
             for( int i = 0 ; i < 4 ; i++ )
                 msg.bytes[ i ] = frame.data[ i ];
-            Serial.print( "\t\tReceiving: " ); Serial.println( msg.value );
+            Serial.print( "\t\tReceiving: " ); 
+            Serial.print(" ID : "); 
+            Serial.print( msg.bytes[0] );
+            Serial.print(" Byte 0 : "); 
+            Serial.print( msg.bytes[1] );
+            Serial.print(" Byte 1 : "); 
+            Serial.print( msg.bytes[2] );
+            Serial.print(" Byte 2 : "); 
+            Serial.println( msg.bytes[3] );
+
             cli(); has_data = cf_stream.get( frame ); sei();
         }
     }
-    delay(1); //some time to breathe
+    delay(3000); //some time to breathe
 }
 
 
