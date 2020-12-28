@@ -119,7 +119,7 @@ void setup()
 
     mcp2515.setFilterMask(MCP2515::MASK0, 0, CAN_SFF_MASK);
     mcp2515.setFilter(MCP2515::RXF0, 0, (uint32_t)ID);
-    mcp2515.setFilter(MCP2515::RXF1, 0, filt1);
+    //mcp2515.setFilter(MCP2515::RXF1, 0, filt1);
     
     mcp2515.setFilterMask(MCP2515::MASK1, 0, mask1);
     mcp2515.setFilter(MCP2515::RXF2, 0, filt1); //accepts msg with ID ending with 1010
