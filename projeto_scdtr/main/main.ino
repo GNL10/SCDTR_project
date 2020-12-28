@@ -9,7 +9,8 @@
 
 // can bus comms
 can_frame_stream *cf_stream = new can_frame_stream();
-MCP2515 mcp2515(10); //SS pin 10
+
+extern MCP2515 mcp2515; // defined in can_bus_comms.cpp
 
 //notification flag for ISR and loop()
 volatile bool can_interrupt = false;
@@ -37,14 +38,12 @@ Controller *ctrl;
 
 volatile bool flag;
 
-enum state : byte {start, send_id_broadcast, wait_for_ids, calibrate, apply_control}; // states of the system
-state curr_state = start;
+enum class State : byte {start, send_id_broadcast, wait_for_ids, calibrate, apply_control}; // states of the system
+State curr_state = State::start;
 
 ISR(TIMER1_COMPA_vect);
 int serial_read_lux ();
 void process_serial_input_command();
-MCP2515::ERROR write(uint32_t id, uint32_t val, uint8_t n_bytes);
-
 
 void setup() {
   Serial.begin(115200);
@@ -87,8 +86,8 @@ void setup() {
   mcp2515.setFilterMask(MCP2515::MASK0, 0, CAN_SFF_MASK);
   mcp2515.setFilter(MCP2515::RXF0, 0, (uint32_t)utils->id_vec[0]); // own id
   
-  mcp2515.setFilterMask(MCP2515::MASK1, 0, BROADCAST_BIT);
-  mcp2515.setFilter(MCP2515::RXF2, 0, BROADCAST_BIT);
+  mcp2515.setFilterMask(MCP2515::MASK1, 0, CAN_SFF_MASK);
+  mcp2515.setFilter(MCP2515::RXF2, 0, CAN_BROADCAST_ID); // own id
 
   mcp2515.setNormalMode();
   // use mcp2515.setLoopbackMode() for local testing
@@ -103,34 +102,48 @@ void loop() {
 
 	switch (curr_state)
 	{
-	case start:
-		curr_state = send_id_broadcast;
+	case State::start:
+		curr_state = State::send_id_broadcast;
 		break;
-	case send_id_broadcast:
-		Serial.print("Printing own id :");
-    Serial.println(utils->id_vec[0]);
-		if( write(BROADCAST_BIT | utils->id_vec[0], CAN_NEW_ID, sizeof(CAN_NEW_ID)) != MCP2515::ERROR_OK )
+	case State::send_id_broadcast:
+		Serial.print("Node with ID : ");Serial.println(utils->id_vec[0]);
+		
+    if(!send_id_broadcast(utils->id_vec[0]))
 			Serial.println( "\t\t\t\tMCP2515 TX Buf Full" );
-		curr_state = wait_for_ids;
+		curr_state = State::wait_for_ids;
 		break;
 
-	case wait_for_ids:
+	case State::wait_for_ids:
     cli(); has_data = cf_stream->get( frame ); sei();
 		if (has_data) {
-			uint8_t id = frame.can_id & ~BROADCAST_BIT;
-			Serial.print( "\t\tReceiving: ID :");
-      Serial.println(id); // remove the broadcast bit
-			if (!utils->add_id(id)) {
-				Serial.println("ERROR: ID number exceeded");
-				curr_state = calibrate;
-			}
-			
+      uint8_t id = frame.data[1];
+			Serial.print( "\t\tReceiving : ID : ");
+      Serial.print(id);
+			Serial.print("\t\tdata : ");
+			for (uint8_t i = 0; i < frame.can_dlc; i++)
+				Serial.print(frame.data[i]);
+			Serial.println();
+
+      if(utils->find_id(id) == -1){ // if id is not found, then it is a new node
+        if (!utils->add_id(id)) { // if id number has been exceeded
+          Serial.println("ERROR: ID number exceeded");
+          curr_state = State::calibrate; // stop the search and move on to calibration
+			  }
+        else { // if the id was correctly added
+          Serial.println("Resending own id");
+          if(!send_id_broadcast(utils->id_vec[0])) // resend its own id
+			      Serial.println( "\t\t\t\tMCP2515 TX Buf Full" );
+        } 
+      }      
+      // if it is not new node, then ignore
+
+      Serial.print("Current number of nodes: ");
+      Serial.println(utils->id_ctr);
 		}
-    //if has_data is true
-      // yes -> add id to node
+    
 
 		if (micros() > WAIT_ID_TIME) { // move on to calibration
-			curr_state = calibrate;
+			curr_state = State::calibrate;
 		}
 		// else
 
@@ -139,11 +152,11 @@ void loop() {
 			
 
 		break;
-	case calibrate:
+	case State::calibrate:
 		Serial.println("Calibrating.");
 		delay(5000);
 		break;
-	case apply_control:
+	case State::apply_control:
 		if (flag) {
     unsigned long init_t = micros();
 
@@ -191,53 +204,9 @@ void loop() {
 		break;
 	}
 
-	/*
-  if(can_interrupt) {
-    can_interrupt = false;
-    if( mcp2515_overflow ) {
-      Serial.println( "\t\t\t\tMCP2516 RX Buf Overflow" );
-      mcp2515_overflow = false;
-    }
-
-    if( arduino_overflow ) {
-      Serial.println( "\t\t\t\tArduino Buffers Overflow" );
-      arduino_overflow = false;
-    }
-    can_frame frame;
-    bool has_data;
-    cli(); has_data = cf_stream->get( frame ); sei();
-    while (has_data) {
-      my_can_msg msg;
-      for( uint8_t i = 0 ; i < frame.can_dlc ; i++ )
-        msg.bytes[ i ] = frame.data[ i ];
-
-      Serial.print( "\t\tReceiving: ID :");
-      Serial.print(frame.can_id & !BROADCAST_BIT); // remove the broadcast bit
-      Serial.print(" -> ");
-      Serial.println(msg.value); // first byte
-      cli(); has_data = cf_stream->get(frame); sei();
-      //must process the message here!!!!!
-      //process_recvd_msg();
-    }
-  }*/
-
-
-
 }
 
 
-MCP2515::ERROR write(uint32_t id, uint32_t val, uint8_t n_bytes) {
-    can_frame frame;
-    frame.can_id = id;
-    frame.can_dlc = n_bytes;
-    my_can_msg msg;
-    msg.value = val; //pack data
-    for( int i = 0; i < n_bytes; i++ ) //prepare can message
-        frame.data[i] = msg.bytes[i];
-    
-    //send data
-    return mcp2515.sendMessage(&frame);
-}
 
 void irqHandler()
 {

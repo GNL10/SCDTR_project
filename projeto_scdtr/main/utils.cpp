@@ -14,6 +14,19 @@ bool Utils::add_id(uint8_t new_id){
 }
 
 /**
+ * Searches id_vec for a given id
+ * @param id ID that is being looked for
+ * @returns -1 if not found, else returns the index of said ID
+ */ 
+int Utils::find_id(uint8_t id) {
+  for(uint8_t i = 0; i < id_ctr; i++){
+    if(id_vec[i] == id)
+      return i;
+  }
+  return -1;
+}
+
+/**
  * Loads the values from the EEPROM to the variables C1, m and b of the program
  */
 void Utils::load_EEPROM_vars() {

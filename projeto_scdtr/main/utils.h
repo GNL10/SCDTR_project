@@ -8,7 +8,7 @@ class Utils
 {
 private:
 public:
-  uint8_t id_ctr;
+  uint8_t id_ctr; // number of ids in id_vec (including its own id)
   uint8_t id_vec[ID_MAX_NUM]; // id[0] is node's own id
   float C1, m, b;
   float static_gain;
@@ -16,6 +16,7 @@ public:
 
   Utils();
   bool add_id(uint8_t new_id);
+  int find_id(uint8_t id);
   void load_EEPROM_vars();
   float calc_lux (float V_AD);
 	float calc_lux ();
