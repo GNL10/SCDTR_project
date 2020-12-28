@@ -12,6 +12,7 @@ private:
 public:
   uint8_t id_ctr; // number of ids in id_vec (including its own id)
   uint8_t id_vec[ID_MAX_NUM]; // id[0] is node's own id
+  uint8_t lowest_id;
   float C1, m, b;
   float static_gain;
   float static_b;

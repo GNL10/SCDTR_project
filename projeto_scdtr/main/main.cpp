@@ -40,6 +40,7 @@ State curr_state = State::start;
 
 ISR(TIMER1_COMPA_vect);
 void process_serial_input_command (char serial_input[], int &idx);
+void irqHandler();
 
 void setup() {
   Serial.begin(115200);
@@ -99,6 +100,7 @@ void loop() {
   can_frame frame;
   bool has_data;
 
+
 	switch (curr_state)
 	{
 	case State::start:
@@ -152,9 +154,47 @@ void loop() {
 
 		break;
 	case State::calibrate:
-		Serial.println("Calibrating.");
-		delay(5000);
-		break;
+  Serial.println("Calibrating.");
+  delay(5000);
+
+  //Problems:
+  //where to initialize the k vector? And lowest_id (only accessable in utils->add_id)?
+  //when do I measure the residual illuminance - vector o - before or after the coupling gains?
+
+  //cli(); has_data = cf_stream->get( frame ); sei();
+  /*if(has_data)
+    //if msg is "Turn your light on"
+      //turn light on
+      //save k[own_id]
+      //broadcast "You may measure"
+      //wait
+      if(k[NUM_OF_IDS]!=0)
+        //curr_state == control
+      else
+        //send to next "Turn your light on"
+    //if msg is "You may measure"
+      //save k[id_of_sender]
+      //send ack?
+
+  if(ID == lowest_id && k[0] == 0) //if I'm the one starting
+    //light on
+    //save k[0]
+    //broadcast "You may measure"
+    //wait
+    if(k[NUM_OF_IDS]!=0)
+        //curr_state == control
+    else
+      //send to next "Turn on your light"*/
+
+
+  //Do I have the lowest id?
+      //yes -> 1. turn on the light; 2. signal the others to start measuring.
+      //no -> waits for signal to start measuring
+
+
+		
+    
+    break;
 	case State::apply_control:
 		if (flag) {
       unsigned long init_t = micros();
