@@ -19,9 +19,6 @@ volatile bool arduino_overflow = false;
 
 const unsigned long sampInterval = 10000; //microseconds 100Hz
 
-char serial_input[SERIAL_INPUT_SIZE+1];
-int serial_input_index = 0;
-
 float v_i = 0;
 unsigned long t_i = 0;
 
@@ -42,12 +39,13 @@ enum class State : byte {start, send_id_broadcast, wait_for_ids, calibrate, appl
 State curr_state = State::start;
 
 ISR(TIMER1_COMPA_vect);
-int serial_read_lux ();
-void process_serial_input_command();
+void process_serial_input_command (char serial_input[], int &idx);
 
 void setup() {
   Serial.begin(115200);
   utils = new Utils();
+
+  utils->isHub();
 
   // set timer 2 divisor to     1 for PWM frequency of 31372.55 Hz
   TCCR2B = (TCCR2B & B11111000) | B00000001;
@@ -88,6 +86,7 @@ void setup() {
   
   mcp2515.setFilterMask(MCP2515::MASK1, 0, CAN_SFF_MASK);
   mcp2515.setFilter(MCP2515::RXF2, 0, CAN_BROADCAST_ID); // own id
+  //TODO if isHub, set mask to accept everything
 
   mcp2515.setNormalMode();
   // use mcp2515.setLoopbackMode() for local testing
@@ -158,48 +157,48 @@ void loop() {
 		break;
 	case State::apply_control:
 		if (flag) {
-    unsigned long init_t = micros();
+      unsigned long init_t = micros();
 
-    if(serial_read_lux()){ // command is ready to be processed
-      process_serial_input_command();
-      x_ref = (occupancy == true) ? occupied_lux : unoccupied_lux; // decides x_ref, depending if it is occupied or not
-      u_ff = (x_ref == 0) ? 0 : (x_ref - utils->static_b)/utils->static_gain; //if x_ref = 0, u_ff = 0
-      t_i = micros();
-      v_i = utils->get_voltage();
+      if(utils->serial_read_lux()){ // command is ready to be processed
+        process_serial_input_command(utils->serial_input, utils->serial_input_index);
+        x_ref = (occupancy == true) ? occupied_lux : unoccupied_lux; // decides x_ref, depending if it is occupied or not
+        u_ff = (x_ref == 0) ? 0 : (x_ref - utils->static_b)/utils->static_gain; //if x_ref = 0, u_ff = 0
+        t_i = micros();
+        v_i = utils->get_voltage();
+      }
+      
+      unsigned long t = micros();
+      
+      float y_ref = sim->calc_LDR_lux(x_ref, v_i, t_i, t);
+      float y = utils->calc_lux();
+
+      int u_sat = ctrl->run_controller(y, y_ref, u_ff);
+      analogWrite(LED_PIN, u_sat);
+
+      
+      //Serial.print(t);
+      //Serial.print(", ");
+      //Serial.print(x_ref);
+      //Serial.print(", ");
+      //Serial.print(y_ref);
+      //Serial.print(", ");
+      Serial.print(y);
+      Serial.print(", ");
+      Serial.print(u_ff);
+      Serial.print(", ");
+      Serial.print(u_sat);
+      Serial.print(", ");
+      Serial.print(y_ref - y);
+      //Serial.print(", ");
+      //Serial.print(get_voltage());
+      Serial.println();
+      /**/
+      unsigned long endTime = micros();
+      unsigned long elapsedTime = endTime - init_t;
+      if(elapsedTime > sampInterval)
+          Serial.println("ERROR: Sampling period was exceeded!");
+      flag = 0;
     }
-    
-    unsigned long t = micros();
-    
-    float y_ref = sim->calc_LDR_lux(x_ref, v_i, t_i, t);
-    float y = utils->calc_lux();
-
-    int u_sat = ctrl->run_controller(y, y_ref, u_ff);
-    analogWrite(LED_PIN, u_sat);
-
-    
-    //Serial.print(t);
-    //Serial.print(", ");
-    //Serial.print(x_ref);
-    //Serial.print(", ");
-    //Serial.print(y_ref);
-    //Serial.print(", ");
-    Serial.print(y);
-    Serial.print(", ");
-    Serial.print(u_ff);
-    Serial.print(", ");
-    Serial.print(u_sat);
-    Serial.print(", ");
-    Serial.print(y_ref - y);
-    //Serial.print(", ");
-    //Serial.print(get_voltage());
-    Serial.println();
-    /**/
-    unsigned long endTime = micros();
-    unsigned long elapsedTime = endTime - init_t;
-    if(elapsedTime > sampInterval)
-        Serial.println("ERROR: Sampling period was exceeded!");
-    flag = 0;
-  }
 	default:
 		break;
 	}
@@ -243,29 +242,12 @@ ISR(TIMER1_COMPA_vect){
 
 
 
-
-/**
- * reads 1 char from serial and concatenates it into the string serial_input
- * @returns 1 when the enter key is pressed else 0
- */
-int serial_read_lux () {
-  if (Serial.available()) {
-    char read_byte = Serial.read();
-    if(read_byte == 10){ // 10 -> new line
-      serial_input[serial_input_index] = '\0';
-      return 1;
-    }
-    serial_input[serial_input_index++] = read_byte;
-  }
-  return 0;
-}
-
 /**
  * Processes the command entered in the serial_input variable
  * Changes occupancy and lower bound values according to command
  */
-void process_serial_input_command () {
-  serial_input_index = 0;
+void process_serial_input_command (char serial_input[], int &idx) {
+  idx = 0;
   char* command = strtok(serial_input, " ");
 
   if (strcmp(command, "o") == 0) { // SET OCCUPANCY

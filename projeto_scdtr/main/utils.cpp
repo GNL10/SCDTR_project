@@ -4,6 +4,7 @@
 Utils::Utils(){
   id_ctr = 0;
   load_EEPROM_vars();
+  hub = false;
 }
 
 bool Utils::add_id(uint8_t new_id){
@@ -92,4 +93,39 @@ void Utils::calc_gain () {
 
   analogWrite(LED_PIN, 0);
   delay(300);
+}
+
+
+/**
+ * reads 1 char from serial and concatenates it into the string serial_input
+ * @returns true when the enter key is pressed else false
+ */
+bool Utils::serial_read_lux () {
+  if (Serial.available()) {
+    char read_byte = Serial.read();
+    if(read_byte == 10){ // 10 -> new line
+      serial_input[serial_input_index] = '\0';
+      return true;
+    }
+    serial_input[serial_input_index++] = read_byte;
+  }
+  return false;
+}
+
+bool Utils::isHub() {
+  Serial.println("Answer by pressing 'z' in the next 5 secs!");
+  long start_t = micros();
+  while (micros()-start_t < HUB_WAIT_TIME) {
+    if (Serial.available()) {
+      char read_byte = Serial.read();
+      if (read_byte == 'z'){
+        hub = true;
+        Serial.println("I AM THE HUB!!");
+        return true;
+      }
+    }
+    delay(10);
+  }
+  hub = false;
+  return false;
 }
