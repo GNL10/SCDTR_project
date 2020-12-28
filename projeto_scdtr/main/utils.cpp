@@ -3,12 +3,16 @@
 
 Utils::Utils(){
   id_ctr = 0;
+  lowest_id = 255;
   load_EEPROM_vars();
 }
 
 bool Utils::add_id(uint8_t new_id){
+
   if(id_ctr == ID_MAX_NUM) // if the max number of nodes has been reached
     return false;
+  if(new_id < lowest_id)
+    lowest_id = new_id; 
   id_vec[id_ctr++] = new_id;
   return true;
 }

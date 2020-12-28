@@ -190,6 +190,9 @@ void loop() {
     case calibrate:
         Serial.println("Calibrating.");
         delay(5000);
+        //Do I have the lowest id?
+            //yes -> 1. turn on the light; 2. signal the others to start measuring.
+            //no -> waits for signal to start measuring
         break;
     default:
         break;
