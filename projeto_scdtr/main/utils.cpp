@@ -117,7 +117,7 @@ bool Utils::serial_read_lux () {
 }
 
 bool Utils::isHub() {
-  Serial.println("Answer by pressing 'z' in the next 5 secs!");
+  Serial.print("Press 'z' in the next "); Serial.print(HUB_WAIT_TIME/1000000); Serial.println(" secs to become the hub!");
   long start_t = micros();
   while (micros()-start_t < HUB_WAIT_TIME) {
     if (Serial.available()) {

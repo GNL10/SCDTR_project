@@ -4,7 +4,7 @@
 #include <Arduino.h>
 #include "configs.h"
 
-#define HUB_WAIT_TIME (long) 10000000
+#define HUB_WAIT_TIME (long) 3000000
 
 class Utils
 {

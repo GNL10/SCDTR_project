@@ -34,17 +34,30 @@ Simulator *sim;
 Controller *ctrl;
 
 volatile bool flag;
+unsigned long last_state_change{0};
+bool wait_event;
+unsigned long timeout{5000000};
 
-enum class State : byte {start, send_id_broadcast, wait_for_ids, calibrate, apply_control}; // states of the system
+can_frame frame;
+bool has_data;
+
+bool sync_sent = false;
+bool sync_recvd = false;
+uint8_t ack_ctr = 0;
+
+enum class State : byte {start, send_id_broadcast, wait_for_ids, sync, calibrate, apply_control}; // states of the system
 State curr_state = State::start;
 
 ISR(TIMER1_COMPA_vect);
+void read_events();
 void process_serial_input_command (char serial_input[], int &idx);
 void irqHandler();
+
 
 void setup() {
   Serial.begin(115200);
   utils = new Utils();
+  Serial.print("Node with ID : ");Serial.println(utils->id_vec[0]);
 
   utils->isHub();
 
@@ -97,99 +110,108 @@ void setup() {
 
 
 void loop() {
-  can_frame frame;
-  bool has_data;
 
+  read_events();
+
+  // process events ? like reset and stuff like that
 
 	switch (curr_state)
 	{
 	case State::start:
 		curr_state = State::send_id_broadcast;
 		break;
+    
 	case State::send_id_broadcast:
-		Serial.print("Node with ID : ");Serial.println(utils->id_vec[0]);
-		
-    if(!send_id_broadcast(utils->id_vec[0]))
-			Serial.println( "\t\t\t\tMCP2515 TX Buf Full" );
+		Serial.print("Sending broadcast with ID : "); Serial.println(utils->id_vec[0]);
+    if(!send_id_broadcast(utils->id_vec[0])) // send its own id
+      Serial.println("\t\t\t\tMCP2515 TX Buf Full");
+    
+    last_state_change = micros();
+    timeout = WAIT_ID_TIME;
+    wait_event = false;
 		curr_state = State::wait_for_ids;
 		break;
 
 	case State::wait_for_ids:
-    cli(); has_data = cf_stream->get( frame ); sei();
-		if (has_data) {
-      uint8_t id = frame.data[1];
-			Serial.print( "\t\tReceiving : ID : ");
-      Serial.print(id);
-			Serial.print("\t\tdata : ");
-			for (uint8_t i = 0; i < frame.can_dlc; i++)
-				Serial.print(frame.data[i]);
-			Serial.println();
+    if(wait_event || sync_recvd){
+      curr_state = State::sync;
+    }
+    else {
+      if (has_data) {
+        uint8_t res = analyse_id_broadcast(frame.data[0], frame.data[1], utils);
+        if(res == 3) // received msg was not of type CAN_NEW_ID
+          break;
+        else if (res == 2) // max number of nodes has been reached
+          curr_state = State::sync; // stop the search and move on to calibration
+        else if (res == 1) // if the id was correctly added
+          curr_state = State::send_id_broadcast; // resend own id
 
-      if(utils->find_id(id) == -1){ // if id is not found, then it is a new node
-        if (!utils->add_id(id)) { // if id number has been exceeded
-          Serial.println("ERROR: ID number exceeded");
-          curr_state = State::calibrate; // stop the search and move on to calibration
-			  }
-        else { // if the id was correctly added
-          Serial.println("Resending own id");
-          if(!send_id_broadcast(utils->id_vec[0])) // resend its own id
-			      Serial.println( "\t\t\t\tMCP2515 TX Buf Full" );
-        } 
-      }      
-      // if it is not new node, then ignore
-
-      Serial.print("Current number of nodes: ");
-      Serial.println(utils->id_ctr);
-		}
-    
-
-		if (micros() > WAIT_ID_TIME) { // move on to calibration
-			curr_state = State::calibrate;
-		}
-		// else
-
-		// add more arduinos to the network
-		// figure out how to add more memory dynamically 
-			
-
+        Serial.print("Current number of nodes: "); Serial.println(utils->id_ctr);
+      }
+    }
 		break;
+
+  case State::sync:
+    if(utils->lowest_id == utils->id_vec[0]){ //if this is lowest id
+      if(!sync_sent){
+        sync_sent = true;
+        if(!send_sync_broadcast(utils->id_vec[0])) // send its own id
+          Serial.println("\t\t\t\tMCP2515 TX Buf Full");
+      }
+      else {
+        if(has_data && frame.data[0] == CAN_ACK){
+          if((++ack_ctr) == utils->id_ctr - 1)
+            curr_state = State::calibrate;
+        }
+      }
+      
+    }
+    else{ // normal node, waits for CAN_SYNC msg
+      if(sync_recvd){
+        uint8_t msg[] = {CAN_ACK, utils->id_vec[0]};
+        if (write(frame.data[1], msg, 2) != MCP2515::ERROR_OK )
+          Serial.println("\t\t\t\tMCP2515 TX Buf Full");          
+        curr_state = State::calibrate;
+      }
+    }
+    break;
 	case State::calibrate:
-  Serial.println("Calibrating.");
-  delay(5000);
+    Serial.println("Calibrating.");
+    delay(5000);
 
-  //Problems:
-  //where to initialize the k vector? And lowest_id (only accessable in utils->add_id)?
-  //when do I measure the residual illuminance - vector o - before or after the coupling gains?
+    //Problems:
+    //where to initialize the k vector? And lowest_id (only accessable in utils->add_id)?
+    //when do I measure the residual illuminance - vector o - before or after the coupling gains?
 
-  //cli(); has_data = cf_stream->get( frame ); sei();
-  /*if(has_data)
-    //if msg is "Turn your light on"
-      //turn light on
-      //save k[own_id]
+    //cli(); has_data = cf_stream->get( frame ); sei();
+    /*if(has_data)
+      //if msg is "Turn your light on"
+        //turn light on
+        //save k[own_id]
+        //broadcast "You may measure"
+        //wait
+        if(k[NUM_OF_IDS]!=0)
+          //curr_state == control
+        else
+          //send to next "Turn your light on"
+      //if msg is "You may measure"
+        //save k[id_of_sender]
+        //send ack?
+
+    if(ID == lowest_id && k[0] == 0) //if I'm the one starting
+      //light on
+      //save k[0]
       //broadcast "You may measure"
       //wait
       if(k[NUM_OF_IDS]!=0)
-        //curr_state == control
+          //curr_state == control
       else
-        //send to next "Turn your light on"
-    //if msg is "You may measure"
-      //save k[id_of_sender]
-      //send ack?
-
-  if(ID == lowest_id && k[0] == 0) //if I'm the one starting
-    //light on
-    //save k[0]
-    //broadcast "You may measure"
-    //wait
-    if(k[NUM_OF_IDS]!=0)
-        //curr_state == control
-    else
-      //send to next "Turn on your light"*/
+        //send to next "Turn on your light"*/
 
 
-  //Do I have the lowest id?
-      //yes -> 1. turn on the light; 2. signal the others to start measuring.
-      //no -> waits for signal to start measuring
+    //Do I have the lowest id?
+        //yes -> 1. turn on the light; 2. signal the others to start measuring.
+        //no -> waits for signal to start measuring
 
 
 		
@@ -247,6 +269,15 @@ void loop() {
 
 
 
+void read_events() {
+  if(micros() - last_state_change > timeout)
+    wait_event = true;
+  cli(); has_data = cf_stream->get(frame); sei();
+  
+  sync_recvd = (frame.data[0] == CAN_SYNC) ? true : false;
+}
+
+
 void irqHandler()
 {
     can_frame frm;
@@ -279,8 +310,6 @@ void irqHandler()
 ISR(TIMER1_COMPA_vect){
   flag = 1; //notify main loop
 }
-
-
 
 /**
  * Processes the command entered in the serial_input variable
