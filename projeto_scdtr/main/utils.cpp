@@ -5,6 +5,7 @@ Utils::Utils(){
   id_ctr = 0;
   lowest_id = 255;
   load_EEPROM_vars();
+
 }
 
 bool Utils::add_id(uint8_t new_id){
@@ -46,6 +47,14 @@ void Utils::load_EEPROM_vars() {
   address += sizeof(m);
   EEPROM.get(address, b);
   address += sizeof(b);
+  Serial.print("Inside id_tmp, C1, m, b: ");
+  Serial.print(id_tmp);
+  Serial.print(", ");
+  Serial.print(C1, 6);
+  Serial.print(", ");
+  Serial.print(m, 5);
+  Serial.print(", ");
+  Serial.println(b, 5);
 }
 
 /**
@@ -80,7 +89,7 @@ float Utils::get_voltage() {
  * Calculates the gain [lux / duty cycle] of the system
  * @returns Gain [lux / duty cycle] to the static_gain global variable
  */
-void Utils::calc_gain () {
+/*void Utils::calc_gain () {
   int max_pwm = 255;
 
   analogWrite(LED_PIN, max_pwm);
@@ -96,4 +105,23 @@ void Utils::calc_gain () {
 
   analogWrite(LED_PIN, 0);
   delay(300);
+}*/
+
+void Utils::calc_gain (uint8_t sender_id) {
+  int d = 255;
+
+  int l = calc_lux(get_voltage());
+  k[find_id(sender_id)] = (l - o)/ d;
+
+  Serial.print("Gain measured: ");
+  Serial.println(k[find_id(sender_id)]);
+}
+
+void Utils::calc_residual_lux () {
+  o = calc_lux(get_voltage()); 
+
+  Serial.print("Residual volt measured: ");
+  Serial.println(get_voltage());
+  Serial.print("Residual Lux measured: ");
+  Serial.println(o); 
 }
