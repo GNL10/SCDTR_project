@@ -4,7 +4,9 @@
 #include "can_frame_stream.h"
 #include "utils.h"
 
-#define WAIT_ID_TIME (unsigned long) 10000000
+#define TX_BUF_FULL_ERR "\t\t\t\tMCP2515 TX Buf Full"
+
+#define WAIT_ID_TIME (unsigned long) 4000000
 #define  WAIT_ACK_TIME (unsigned long) 100000000
 
 #define CAN_BROADCAST_ID (uint32_t) 0x000007FF
@@ -25,10 +27,8 @@ union { // anonymous union
    };
 */
 
-uint8_t analyse_id_broadcast (uint8_t cmd, uint8_t id, Utils *utils);
 bool send_msg (uint8_t id, uint8_t my_id, uint8_t code);
 bool broadcast (uint8_t id, uint8_t code);
-bool wait_for_acks (uint8_t N_nodes);
 void print_msg ();
 MCP2515::ERROR write(uint32_t id, uint8_t bytes[], uint8_t n_bytes);
 #endif

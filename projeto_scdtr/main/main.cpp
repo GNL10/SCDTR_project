@@ -1,5 +1,4 @@
 #include <math.h>
-#include <string.h>
 #include "configs.h"
 #include "simulator.h"
 #include "controller.h"
@@ -18,20 +17,17 @@ volatile bool can_interrupt = false;
 volatile bool mcp2515_overflow = false;
 volatile bool arduino_overflow = false;
 
-const unsigned long sampInterval = 10000; //microseconds 100Hz
+volatile float v_i = 0;
+volatile unsigned long t_i = 0;
 
-float v_i = 0;
-unsigned long t_i = 0;
+volatile float u_ff = 0;
+volatile float x_ref = 0;
 
-float u_ff = 0;
-float x_ref = 0;
-
-bool occupancy = false;
-float occupied_lux = 50;
-float unoccupied_lux = 20;
+volatile bool occupancy = false;
+volatile float occupied_lux = 50;
+volatile float unoccupied_lux = 20;
 
 uint8_t my_id; 
-uint8_t master_id;
 
 Utils *utils;
 Simulator *sim;
@@ -39,22 +35,23 @@ Controller *ctrl;
 
 volatile bool flag;
 unsigned long last_state_change{0};
-bool wait_event;
-unsigned long timeout{5000000};
+volatile bool wait_event;
+volatile unsigned long timeout{5000000};
 
-bool has_data;
+volatile bool has_data;
 
-bool sync_sent = false;
-bool sync_recvd = false;
-uint8_t ack_ctr = 0;
+volatile bool sync_recvd = false;
+volatile uint8_t ack_ctr = 0;
 
 enum class State : byte {start, send_id_broadcast, wait_for_ids, sync, calibrate, apply_control, calib_end}; // states of the system
-State curr_state = State::start;
+volatile State curr_state = State::start;
 
 ISR(TIMER1_COMPA_vect);
 void read_events();
 void process_serial_input_command (char serial_input[], int &idx);
 void irqHandler();
+void control_interrupt_setup();
+void can_bus_setup();
 
 
 void setup() {
@@ -69,46 +66,11 @@ void setup() {
   TCCR2B = (TCCR2B & B11111000) | B00000001;
   pinMode(LED_PIN, OUTPUT);
 
-  //utils->calc_gain();
-
   sim = new Simulator(utils->m, utils->b, R1, utils->C1, VCC);
   ctrl = new Controller(error_margin, K1, K2, true);
 
-  cli(); //disable interrupts
-  TCCR1A = 0; // clear register
-  TCCR1B = 0; // clear register
-  TCNT1 = 0; //reset counter
-
-  // OCR1A = desired_period/clock_period – 1
-  // = clock_freq/desired_freq - 1
-  // = (16*10^6Hz / 8) / (100Hz) – 1
-  OCR1A = 19999; //must be <65536
-  TCCR1B |= (1 << WGM12); //CTC On
-  // Set prescaler for 8
-  TCCR1B |= (1 << CS11);
-
-  // enable timer compare interrupt
-  TIMSK1 |= (1 << OCIE1A);
-  sei(); //enable interrupts
-
-	/* CAN BUS SETUP */
-  SPI.begin();
-  attachInterrupt(0, irqHandler, FALLING); //use interrupt at pin 2
-  //Must tell SPI lib that ISR for interrupt vector zero will be using SPI
-  SPI.usingInterrupt(0);
-  mcp2515.reset();
-	mcp2515.setBitrate(CAN_1000KBPS, MCP_16MHZ);
-
-  mcp2515.setFilterMask(MCP2515::MASK0, 0, CAN_SFF_MASK);
-  mcp2515.setFilter(MCP2515::RXF0, 0, (uint32_t)utils->id_vec[0]); // own id
-  
-  mcp2515.setFilterMask(MCP2515::MASK1, 0, CAN_SFF_MASK);
-  mcp2515.setFilter(MCP2515::RXF2, 0, CAN_BROADCAST_ID); // own id
-  //TODO if isHub, set mask to accept everything
-
-  mcp2515.setNormalMode();
-  // use mcp2515.setLoopbackMode() for local testing
-  //mcp2515.setLoopbackMode();
+  control_interrupt_setup();
+  can_bus_setup();
 
 }
 
@@ -127,7 +89,7 @@ void loop() {
 	case State::send_id_broadcast:
 		Serial.print("Sending broadcast with ID : "); Serial.println(utils->id_vec[0]);
     if(!broadcast(my_id, CAN_NEW_ID)) // send its own id
-      Serial.println("\t\t\t\tMCP2515 TX Buf Full");
+      Serial.println(TX_BUF_FULL_ERR);
     
     last_state_change = micros();
     timeout = WAIT_ID_TIME;
@@ -141,7 +103,7 @@ void loop() {
     }
     else {
       if (has_data) {
-        uint8_t res = analyse_id_broadcast(frame.data[0], frame.data[1], utils);
+        uint8_t res = utils->analyse_id_broadcast(frame.data[0], frame.data[1]);
         if(res == 3) // received msg was not of type CAN_NEW_ID
           break;
         else if (res == 2) // max number of nodes has been reached
@@ -155,131 +117,22 @@ void loop() {
 		break;
 
   case State::sync:
-    if(utils->lowest_id == utils->id_vec[0]){ //if this is lowest id
-      if(!sync_sent){
-        sync_sent = true;
-        if(!broadcast(my_id, CAN_SYNC)) // send its own id
-          Serial.println("\t\t\t\tMCP2515 TX Buf Full");
-      }
-      else {
-        if(has_data && frame.data[0] == CAN_ACK){
-          if((++ack_ctr) == utils->id_ctr - 1){
-            ack_ctr = 0;
-            curr_state = State::calibrate;
-          }
-        }
-      }
-      
-    }
-    else{ // normal node, waits for CAN_SYNC msg
-      if(sync_recvd){
-        if(!send_msg(frame.data[1], my_id, CAN_ACK))
-			    Serial.println( "\t\t\t\tMCP2515 TX Buf Full" );
-          curr_state = State::calibrate;
-      }
+    if(utils->sync(has_data, frame, sync_recvd)) {
+      Serial.println("\n\n######## SYNCHRONIZED ########\n\n");
+      curr_state = State::calibrate;
     }
     break;
 
 	case State::calibrate:
-
-    if(my_id==utils->lowest_id)
-    {
-      utils->calc_residual_lux();
-
-      if(!broadcast(my_id, 'r')) //broadcast "Measure Residual Lux"+my_id
-          Serial.println( "\t\t\t\tMCP2515 TX Buf Full" );
-
-      analogWrite(LED_PIN, 255); //Light on
-      delay(LED_WAIT_TIME);
-
-      utils->calc_gain(my_id);
-
-      if(!broadcast(my_id, 'm')) //broadcast "Measure"+my_id
-          Serial.println( "\t\t\t\tMCP2515 TX Buf Full" );
-      delay(MEASURE_WAIT_TIME);
-      Serial.println("Light off");
-      analogWrite(LED_PIN, 0); //Light off
-
-    for(int i = 1; i<utils->id_ctr; i++)
-    {     
-      if(!send_msg(utils->id_vec[i], my_id, 'l')) //send "Light on"
-			  Serial.println( "\t\t\t\tMCP2515 TX Buf Full" );
-      delay(LED_WAIT_TIME);
-
-      utils->calc_gain(utils->id_vec[i]);
-
-      if(!broadcast(utils->id_vec[i], 'm')) //broadcast "Measure"+id
-			  Serial.println( "\t\t\t\tMCP2515 TX Buf Full" );
-      
-      delay(MEASURE_WAIT_TIME);
-      if(!send_msg(utils->id_vec[i], my_id, 'o')) //send "Light off"
-			  Serial.println( "\t\t\t\tMCP2515 TX Buf Full" );
-    }
-
-    Serial.println("Broadcast calibration complete");
-    if(!broadcast(my_id, 'c')) //broadcast "Calibration Complete"
-			  Serial.println( "\t\t\t\tMCP2515 TX Buf Full" );
-
-    curr_state = State::calib_end;
-
-  }
-
-    else{
-      if (has_data) 
-      {
-        if(frame.data[0] == 114) //'r' in decimal
-        {
-          print_msg();
-          master_id = frame.data[1];
-          Serial.println("Calculating residual lux."); 
-          utils->calc_residual_lux();
-        }
-        if(frame.data[0] == 108) //'l' in decimal
-        {
-          print_msg();
-          analogWrite(LED_PIN, 255); //Light on
-          Serial.println("Light on.");
-        }
-
-        if(frame.data[0] == 111) //'o' in decimal
-        {
-          print_msg();
-          analogWrite(LED_PIN, 0); //Light off
-          Serial.println("Light off.");
-        }
-        if(frame.data[0] == 109) //'m' in decimal
-        {
-          print_msg();
-          Serial.println("Calculating gain.");
-          utils->calc_gain(frame.data[1]);          
-        }
-
-        if(frame.data[0] == 99) //'c' in decimal
-        {
-          print_msg();
-          Serial.println("Calibration complete");
-          curr_state = State::calib_end;
-        }
-
-        for (int i=0; i<utils->id_ctr; i++)
-        {
-          Serial.print("k");
-          Serial.print(i);
-          Serial.print(": ");
-          Serial.println(utils->k[i]);
-        }
-      }
-  }
-  //listening
-  //if receives "Measure"
-    //measure and save k[id_sender]
-    //send ACK
-  //else if receives "Light on"
-    //light on
-    //send ACK
-    //measure and save k[own_id]
-
+    if(utils->calibrate(has_data, frame) == true)//if calibration is over
+      curr_state = State::calib_end;
     break;
+
+  case State::calib_end:
+    Serial.println("End of Calibration.");
+    delay(5000);
+    break;
+
 	case State::apply_control:
 		if (flag) {
       unsigned long init_t = micros();
@@ -326,11 +179,7 @@ void loop() {
     }
 	default:
 		break;
-  case State::calib_end:
-    Serial.println("End of Calibration.");
-    delay(5000);
-	}
-
+  }
 }
 
 
@@ -339,8 +188,9 @@ void read_events() {
   if(micros() - last_state_change > timeout)
     wait_event = true;
   cli(); has_data = cf_stream->get(frame); sei();
-  
-  sync_recvd = (frame.data[0] == CAN_SYNC) ? true : false;
+  if (has_data && frame.data[0] == CAN_SYNC ) {
+    sync_recvd = true;
+  }
 }
 
 
@@ -401,4 +251,44 @@ void process_serial_input_command (char serial_input[], int &idx) {
     unoccupied_lux = atof(strtok(0, " "));
   }
 
+}
+
+void control_interrupt_setup () {
+  cli(); //disable interrupts
+  TCCR1A = 0; // clear register
+  TCCR1B = 0; // clear register
+  TCNT1 = 0; //reset counter
+
+  // OCR1A = desired_period/clock_period – 1
+  // = clock_freq/desired_freq - 1
+  // = (16*10^6Hz / 8) / (100Hz) – 1
+  OCR1A = 19999; //must be <65536
+  TCCR1B |= (1 << WGM12); //CTC On
+  // Set prescaler for 8
+  TCCR1B |= (1 << CS11);
+
+  // enable timer compare interrupt
+  TIMSK1 |= (1 << OCIE1A);
+  sei(); //enable interrupts
+}
+
+void can_bus_setup() {
+	/* CAN BUS SETUP */
+  SPI.begin();
+  attachInterrupt(0, irqHandler, FALLING); //use interrupt at pin 2
+  //Must tell SPI lib that ISR for interrupt vector zero will be using SPI
+  SPI.usingInterrupt(0);
+  mcp2515.reset();
+	mcp2515.setBitrate(CAN_1000KBPS, MCP_16MHZ);
+
+  mcp2515.setFilterMask(MCP2515::MASK0, 0, CAN_SFF_MASK);
+  mcp2515.setFilter(MCP2515::RXF0, 0, (uint32_t)utils->id_vec[0]); // own id
+  
+  mcp2515.setFilterMask(MCP2515::MASK1, 0, CAN_SFF_MASK);
+  mcp2515.setFilter(MCP2515::RXF2, 0, CAN_BROADCAST_ID); // own id
+  //TODO if isHub, set mask to accept everything
+
+  mcp2515.setNormalMode();
+  // use mcp2515.setLoopbackMode() for local testing
+  //mcp2515.setLoopbackMode();
 }

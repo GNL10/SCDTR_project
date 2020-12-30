@@ -3,6 +3,7 @@
 
 #include <Arduino.h>
 #include "configs.h"
+#include "can_bus_comms.h"
 
 #define HUB_WAIT_TIME (long) 3000000
 #define LED_WAIT_TIME (unsigned long) 500 
@@ -20,6 +21,9 @@ public:
   float C1, m, b;
   bool hub; // true if node is a hub
 
+  uint8_t ack_ctr;
+  bool sync_sent;
+
   char serial_input[SERIAL_INPUT_SIZE+1];
   int serial_input_index = 0;
 
@@ -31,9 +35,15 @@ public:
 	float calc_lux ();
   float get_voltage();
   void calc_gain (uint8_t sender_id);
+
+  uint8_t analyse_id_broadcast (uint8_t cmd, uint8_t id);
+
   void calc_residual_lux ();
   bool serial_read_lux();
   bool isHub();
+
+  bool sync (bool has_data, can_frame &frame, bool sync_recvd);
+  bool calibrate (bool has_data, can_frame &frame);
   
 };
 #endif
