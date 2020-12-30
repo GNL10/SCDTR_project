@@ -16,19 +16,14 @@
 
 //union to pack/unpack long ints into bytes
 union my_can_msg {
-   unsigned long value;
+   float value;
    unsigned char bytes[4];
 };
 
-/* EXAMPLE NOT TO BE USED!!!!!
-union { // anonymous union
-      struct { int i, j; }; // anonymous structure
-      struct { long k, l; } w;
-   };
-*/
-
 bool send_msg (uint8_t id, uint8_t my_id, uint8_t code);
 bool broadcast (uint8_t id, uint8_t code);
+//bool wait_for_acks (uint8_t N_nodes);
+bool send_control_msg(uint8_t id, uint8_t my_id, uint8_t code, float u);
 void print_msg ();
 MCP2515::ERROR write(uint32_t id, uint8_t bytes[], uint8_t n_bytes);
 #endif

@@ -23,6 +23,8 @@ volatile unsigned long t_i = 0;
 volatile float u_ff = 0;
 volatile float x_ref = 0;
 
+int step = 0; //initialize time step for control
+
 volatile bool occupancy = false;
 volatile float occupied_lux = 50;
 volatile float unoccupied_lux = 20;
@@ -43,8 +45,8 @@ volatile bool has_data;
 volatile bool sync_recvd = false;
 volatile uint8_t ack_ctr = 0;
 
-enum class State : byte {start, send_id_broadcast, wait_for_ids, sync, calibrate, apply_control, calib_end}; // states of the system
-volatile State curr_state = State::start;
+enum class State : byte {start, send_id_broadcast, wait_for_ids, sync, calibrate, apply_control, negotiate, end}; // states of the system
+State curr_state = State::start;
 
 ISR(TIMER1_COMPA_vect);
 void read_events();
@@ -52,6 +54,7 @@ void process_serial_input_command (char serial_input[], int &idx);
 void irqHandler();
 void control_interrupt_setup();
 void can_bus_setup();
+bool negotiate();
 
 
 void setup() {
@@ -125,12 +128,7 @@ void loop() {
 
 	case State::calibrate:
     if(utils->calibrate(has_data, frame) == true)//if calibration is over
-      curr_state = State::calib_end;
-    break;
-
-  case State::calib_end:
-    Serial.println("End of Calibration.");
-    delay(5000);
+      curr_state = State::apply_control;
     break;
 
 	case State::apply_control:
@@ -152,7 +150,6 @@ void loop() {
 
       int u_sat = ctrl->run_controller(y, y_ref, u_ff);
       analogWrite(LED_PIN, u_sat);
-
       
       //Serial.print(t);
       //Serial.print(", ");
@@ -176,10 +173,43 @@ void loop() {
       if(elapsedTime > sampInterval)
           Serial.println("ERROR: Sampling period was exceeded!");
       flag = 0;
+      curr_state = State::negotiate;
     }
-	default:
-		break;
+
+    
+    break;
+  case State::negotiate:
+    if(negotiate()){
+      curr_state = State::end;
+    }
+    break;
+  case State::end:
+    break;
+  default: 
+    break;
+	}
+
+}
+
+bool negotiate(){
+
+  if(my_id == utils->lowest_id && step == 0){
+        send_control_msg(utils->id_vec[1], my_id, 'u', 0.5);
+        step = 1;
   }
+  if(has_data){
+    print_msg();
+    Serial.println("Calculating u");
+    my_can_msg rcv_u;
+    for( int i = 2; i < 6; i++ ) //prepare can message
+      rcv_u.bytes[i-2] = frame.data[i];
+    Serial.print("float received: ");
+    Serial.println(rcv_u.value) ; 
+    send_control_msg(utils->id_vec[1], my_id, 'u', 0.5);
+    return true;
+  }
+  
+  return false;
 }
 
 
