@@ -32,6 +32,19 @@ bool send_msg (uint8_t id, uint8_t my_id, uint8_t code) {
     return true;
 }
 
+bool send_control_msg(uint8_t id, uint8_t my_id, uint8_t code, float u){
+    my_can_msg m;
+    m.value = u;
+    uint8_t msg[6];
+    msg[0] = code;
+    msg[1] = my_id;
+    for( int i = 2; i < 6; i++ ) //prepare can message
+        msg[i] = m.bytes[i-2];
+    if(write(id, msg, sizeof(msg)) != MCP2515::ERROR_OK )
+        return false;
+    return true;
+}
+
 bool broadcast (uint8_t id, uint8_t code) { //make it general
     uint8_t msg[] {code, id};
 
@@ -40,7 +53,7 @@ bool broadcast (uint8_t id, uint8_t code) { //make it general
     return true;
 }
 
-bool wait_for_acks (uint8_t N_nodes) {
+/*bool wait_for_acks (uint8_t N_nodes) {
     unsigned long t_i = micros();
     int ack_ctr = 0;
     bool has_data;
@@ -64,12 +77,12 @@ bool wait_for_acks (uint8_t N_nodes) {
     }
     if(ack_ctr != N_nodes - 1)
         return false;
-}
+}*/
 
 void print_msg () {
-    uint8_t sender_id = frame.data[1];
-    Serial.print( "\t\tReceiving : ID : ");
-    Serial.print(sender_id);
+
+    Serial.print("\t\tReceiving : cmd : "); Serial.print((char)frame.data[0]);
+	Serial.print(" ID : "); Serial.print(frame.data[1]);
     Serial.print("\t\tdata : ");
     for (uint8_t i = 0; i < frame.can_dlc; i++)
     {

@@ -4,7 +4,7 @@
 #include "can_frame_stream.h"
 #include "utils.h"
 
-#define WAIT_ID_TIME (unsigned long) 10000000
+#define WAIT_ID_TIME (unsigned long) 4000000
 #define  WAIT_ACK_TIME (unsigned long) 100000000
 
 #define CAN_BROADCAST_ID (uint32_t) 0x000007FF
@@ -14,21 +14,15 @@
 
 //union to pack/unpack long ints into bytes
 union my_can_msg {
-   unsigned long value;
+   float value;
    unsigned char bytes[4];
 };
-
-/* EXAMPLE NOT TO BE USED!!!!!
-union { // anonymous union
-      struct { int i, j; }; // anonymous structure
-      struct { long k, l; } w;
-   };
-*/
 
 uint8_t analyse_id_broadcast (uint8_t cmd, uint8_t id, Utils *utils);
 bool send_msg (uint8_t id, uint8_t my_id, uint8_t code);
 bool broadcast (uint8_t id, uint8_t code);
-bool wait_for_acks (uint8_t N_nodes);
+//bool wait_for_acks (uint8_t N_nodes);
+bool send_control_msg(uint8_t id, uint8_t my_id, uint8_t code, float u);
 void print_msg ();
 MCP2515::ERROR write(uint32_t id, uint8_t bytes[], uint8_t n_bytes);
 #endif

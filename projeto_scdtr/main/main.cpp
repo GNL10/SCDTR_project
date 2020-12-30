@@ -25,6 +25,7 @@ unsigned long t_i = 0;
 
 float u_ff = 0;
 float x_ref = 0;
+int step = 0; //initialize time step for control
 
 bool occupancy = false;
 float occupied_lux = 50;
@@ -48,13 +49,14 @@ bool sync_sent = false;
 bool sync_recvd = false;
 uint8_t ack_ctr = 0;
 
-enum class State : byte {start, send_id_broadcast, wait_for_ids, sync, calibrate, apply_control, calib_end}; // states of the system
+enum class State : byte {start, send_id_broadcast, wait_for_ids, sync, calibrate, apply_control, negotiate, end}; // states of the system
 State curr_state = State::start;
 
 ISR(TIMER1_COMPA_vect);
 void read_events();
 void process_serial_input_command (char serial_input[], int &idx);
 void irqHandler();
+bool negotiate();
 
 
 void setup() {
@@ -220,55 +222,55 @@ void loop() {
     if(!broadcast(my_id, 'c')) //broadcast "Calibration Complete"
 			  Serial.println( "\t\t\t\tMCP2515 TX Buf Full" );
 
-    curr_state = State::calib_end;
+    curr_state = State::apply_control;
 
   }
 
-    else{
-      if (has_data) 
+  else{
+    if (has_data) 
+    {
+      if(frame.data[0] == 114) //'r' in decimal
       {
-        if(frame.data[0] == 114) //'r' in decimal
-        {
-          print_msg();
-          master_id = frame.data[1];
-          Serial.println("Calculating residual lux."); 
-          utils->calc_residual_lux();
-        }
-        if(frame.data[0] == 108) //'l' in decimal
-        {
-          print_msg();
-          analogWrite(LED_PIN, 255); //Light on
-          Serial.println("Light on.");
-        }
-
-        if(frame.data[0] == 111) //'o' in decimal
-        {
-          print_msg();
-          analogWrite(LED_PIN, 0); //Light off
-          Serial.println("Light off.");
-        }
-        if(frame.data[0] == 109) //'m' in decimal
-        {
-          print_msg();
-          Serial.println("Calculating gain.");
-          utils->calc_gain(frame.data[1]);          
-        }
-
-        if(frame.data[0] == 99) //'c' in decimal
-        {
-          print_msg();
-          Serial.println("Calibration complete");
-          curr_state = State::calib_end;
-        }
-
-        for (int i=0; i<utils->id_ctr; i++)
-        {
-          Serial.print("k");
-          Serial.print(i);
-          Serial.print(": ");
-          Serial.println(utils->k[i]);
-        }
+        print_msg();
+        master_id = frame.data[1];
+        Serial.println("Calculating residual lux."); 
+        utils->calc_residual_lux();
       }
+      if(frame.data[0] == 108) //'l' in decimal
+      {
+        print_msg();
+        analogWrite(LED_PIN, 255); //Light on
+        Serial.println("Light on.");
+      }
+
+      if(frame.data[0] == 111) //'o' in decimal
+      {
+        print_msg();
+        analogWrite(LED_PIN, 0); //Light off
+        Serial.println("Light off.");
+      }
+      if(frame.data[0] == 109) //'m' in decimal
+      {
+        print_msg();
+        Serial.println("Calculating gain.");
+        utils->calc_gain(frame.data[1]);          
+      }
+
+      if(frame.data[0] == 99) //'c' in decimal
+      {
+        print_msg();
+        Serial.println("Calibration complete");
+        curr_state = State::apply_control;
+      }
+
+      for (int i=0; i<utils->id_ctr; i++)
+      {
+        Serial.print("k");
+        Serial.print(i);
+        Serial.print(": ");
+        Serial.println(utils->k[i]);
+      }
+    }
   }
   //listening
   //if receives "Measure"
@@ -299,7 +301,6 @@ void loop() {
 
       int u_sat = ctrl->run_controller(y, y_ref, u_ff);
       analogWrite(LED_PIN, u_sat);
-
       
       //Serial.print(t);
       //Serial.print(", ");
@@ -323,14 +324,43 @@ void loop() {
       if(elapsedTime > sampInterval)
           Serial.println("ERROR: Sampling period was exceeded!");
       flag = 0;
+      curr_state = State::negotiate;
     }
-	default:
-		break;
-  case State::calib_end:
-    Serial.println("End of Calibration.");
-    delay(5000);
+
+    
+    break;
+  case State::negotiate:
+    if(negotiate()){
+      curr_state = State::end;
+    }
+    break;
+  case State::end:
+    break;
+  default: 
+    break;
 	}
 
+}
+
+bool negotiate(){
+
+  if(my_id == utils->lowest_id && step == 0){
+        send_control_msg(utils->id_vec[1], my_id, 'u', 0.5);
+        step = 1;
+  }
+  if(has_data){
+    print_msg();
+    Serial.println("Calculating u");
+    my_can_msg rcv_u;
+    for( int i = 2; i < 6; i++ ) //prepare can message
+      rcv_u.bytes[i-2] = frame.data[i];
+    Serial.print("float received: ");
+    Serial.println(rcv_u.value) ; 
+    send_control_msg(utils->id_vec[1], my_id, 'u', 0.5);
+    return true;
+  }
+  
+  return false;
 }
 
 
@@ -339,7 +369,8 @@ void read_events() {
   if(micros() - last_state_change > timeout)
     wait_event = true;
   cli(); has_data = cf_stream->get(frame); sei();
-  
+  if(has_data)
+    print_msg();
   sync_recvd = (frame.data[0] == CAN_SYNC) ? true : false;
 }
 
