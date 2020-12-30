@@ -5,6 +5,8 @@
 #include "configs.h"
 
 #define HUB_WAIT_TIME (long) 3000000
+#define LED_WAIT_TIME (unsigned long) 500 
+#define MEASURE_WAIT_TIME (unsigned long ) 200
 
 class Utils
 {

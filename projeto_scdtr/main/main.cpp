@@ -126,7 +126,7 @@ void loop() {
     
 	case State::send_id_broadcast:
 		Serial.print("Sending broadcast with ID : "); Serial.println(utils->id_vec[0]);
-    if(!send_id_broadcast(utils->id_vec[0])) // send its own id
+    if(!broadcast(my_id, CAN_NEW_ID)) // send its own id
       Serial.println("\t\t\t\tMCP2515 TX Buf Full");
     
     last_state_change = micros();
@@ -158,26 +158,28 @@ void loop() {
     if(utils->lowest_id == utils->id_vec[0]){ //if this is lowest id
       if(!sync_sent){
         sync_sent = true;
-        if(!send_sync_broadcast(utils->id_vec[0])) // send its own id
+        if(!broadcast(my_id, CAN_SYNC)) // send its own id
           Serial.println("\t\t\t\tMCP2515 TX Buf Full");
       }
       else {
         if(has_data && frame.data[0] == CAN_ACK){
-          if((++ack_ctr) == utils->id_ctr - 1)
+          if((++ack_ctr) == utils->id_ctr - 1){
+            ack_ctr = 0;
             curr_state = State::calibrate;
+          }
         }
       }
       
     }
     else{ // normal node, waits for CAN_SYNC msg
       if(sync_recvd){
-        uint8_t msg[] = {CAN_ACK, utils->id_vec[0]};
-        if (write(frame.data[1], msg, 2) != MCP2515::ERROR_OK )
-          Serial.println("\t\t\t\tMCP2515 TX Buf Full");          
-        curr_state = State::calibrate;
+        if(!send_msg(frame.data[1], my_id, CAN_ACK))
+			    Serial.println( "\t\t\t\tMCP2515 TX Buf Full" );
+          curr_state = State::calibrate;
       }
     }
     break;
+
 	case State::calibrate:
 
     if(my_id==utils->lowest_id)
@@ -186,135 +188,88 @@ void loop() {
 
       if(!broadcast(my_id, 'r')) //broadcast "Measure Residual Lux"+my_id
           Serial.println( "\t\t\t\tMCP2515 TX Buf Full" );
-      Serial.println("waiting for ACKs."); //wait for Acks
-      if(!wait_for_acks(utils->id_ctr))
-      {
-        if(!broadcast(my_id, 'r')) //broadcast "Measure Residual Lux"+my_id
-          Serial.println( "\t\t\t\tMCP2515 TX Buf Full" );
-      }
 
-    analogWrite(LED_PIN, 255); //Light on
-    delay(500);
-    utils->calc_gain(my_id);
-    if(!broadcast(my_id, 'm')) //broadcast "Measure"+my_id
-			  Serial.println( "\t\t\t\tMCP2515 TX Buf Full" );
-    Serial.println("waiting for ACKs."); //wait for Acks
-    wait_for_acks(utils->id_ctr);
-    Serial.println("Light off");
-    analogWrite(LED_PIN, 0); //Light off
+      analogWrite(LED_PIN, 255); //Light on
+      delay(LED_WAIT_TIME);
+
+      utils->calc_gain(my_id);
+
+      if(!broadcast(my_id, 'm')) //broadcast "Measure"+my_id
+          Serial.println( "\t\t\t\tMCP2515 TX Buf Full" );
+      delay(MEASURE_WAIT_TIME);
+      Serial.println("Light off");
+      analogWrite(LED_PIN, 0); //Light off
 
     for(int i = 1; i<utils->id_ctr; i++)
     {     
       if(!send_msg(utils->id_vec[i], my_id, 'l')) //send "Light on"
 			  Serial.println( "\t\t\t\tMCP2515 TX Buf Full" );
-      Serial.println("waiting for ACK.");
-      wait_for_acks(2);                       //waits for 1 ACK
+      delay(LED_WAIT_TIME);
+
       utils->calc_gain(utils->id_vec[i]);
+
       if(!broadcast(utils->id_vec[i], 'm')) //broadcast "Measure"+id
 			  Serial.println( "\t\t\t\tMCP2515 TX Buf Full" );
-      Serial.println("waiting for ACKs");
-      wait_for_acks(utils->id_ctr); 
+      
+      delay(MEASURE_WAIT_TIME);
       if(!send_msg(utils->id_vec[i], my_id, 'o')) //send "Light off"
 			  Serial.println( "\t\t\t\tMCP2515 TX Buf Full" );
-      wait_for_acks(2);                       //waits for 1 ACK
     }
 
+    Serial.println("Broadcast calibration complete");
     if(!broadcast(my_id, 'c')) //broadcast "Calibration Complete"
 			  Serial.println( "\t\t\t\tMCP2515 TX Buf Full" );
-    Serial.println("waiting for ACKs");
-    wait_for_acks(utils->id_ctr);
 
-    for (int i=0; i<utils->id_ctr; i++)
-    {
-      Serial.print("k");
-      Serial.print(i);
-      Serial.print(": ");
-      Serial.println(utils->k[i]);
-    }
     curr_state = State::calib_end;
 
   }
 
-  //broadcast "Measure Residual"
-  //wait for ACKS
-  //measure and save o
-  //light on
-  //delay
-  //measure and save k
-  //broadcast "Measure"+my_id
-  //wait for ACKS
-  
-  //for(int i = 0; i<utils->id_ctr; i++){
-    //choose next id
-    //send "Light on" to next id
-    //wait for ACK
-    //delay
-    //measure and save k[next_id]
-    //broadcast "measure"+next_id
-    //wait for ACKS
-  //}
-
-else
-  //cli(); has_data = cf_stream->get( frame ); sei();
-  if (has_data) 
-  {
-    if(frame.data[0] == 114) //'r' in decimal
-    {
-      print_msg();
-      master_id = frame.data[1];
-      Serial.println("Calculating residual lux."); 
-      utils->calc_residual_lux();
-      delay(5000);
-      if(!send_msg(master_id, my_id, 'k')) //send ack
-			  Serial.println( "\t\t\t\tMCP2515 TX Buf Full" );
-    }      
-    if(frame.data[0] == 108) //'l' in decimal
-    {
-      print_msg();
-      analogWrite(LED_PIN, 255); //Light on
-      Serial.println("Light on.");
-      delay(1000);
-      if(!send_msg(master_id, my_id, 'k')) //send ack
-			  Serial.println( "\t\t\t\tMCP2515 TX Buf Full" );
-    }
-    if(frame.data[0] == 111) //'o' in decimal
-    {
-      print_msg();
-      analogWrite(LED_PIN, 0); //Light off
-      Serial.println("Light off.");
-      delay(1000);
-      if(!send_msg(master_id, my_id, 'k')) //send ack
-			  Serial.println( "\t\t\t\tMCP2515 TX Buf Full" );
-    }
-    if(frame.data[0] == 109) //'m' in decimal
-    {
-      print_msg();
-      Serial.println("Calculating gain.");
-      utils->calc_gain(frame.data[1]);
-      delay(1000);
-      if(!send_msg(master_id, my_id, 'k')) //send ack
-			  Serial.println( "\t\t\t\tMCP2515 TX Buf Full" );
-      
-    }
-    if(frame.data[0] == 99) //'c' in decimal
-    {
-      print_msg();
-      delay(1000);
-      if(!send_msg(master_id, my_id, 'k')) //send ack
-			  Serial.println( "\t\t\t\tMCP2515 TX Buf Full" );
-      
-      for (int i=0; i<utils->id_ctr; i++)
+    else{
+      if (has_data) 
       {
-        Serial.print("k");
-        Serial.print(i);
-        Serial.print(": ");
-        Serial.println(utils->k[i]);
-      }
-      curr_state = State::calib_end;
-    }
-      
-  }
+        if(frame.data[0] == 114) //'r' in decimal
+        {
+          print_msg();
+          master_id = frame.data[1];
+          Serial.println("Calculating residual lux."); 
+          utils->calc_residual_lux();
+        }
+        if(frame.data[0] == 108) //'l' in decimal
+        {
+          print_msg();
+          analogWrite(LED_PIN, 255); //Light on
+          Serial.println("Light on.");
+        }
 
+        if(frame.data[0] == 111) //'o' in decimal
+        {
+          print_msg();
+          analogWrite(LED_PIN, 0); //Light off
+          Serial.println("Light off.");
+        }
+        if(frame.data[0] == 109) //'m' in decimal
+        {
+          print_msg();
+          Serial.println("Calculating gain.");
+          utils->calc_gain(frame.data[1]);          
+        }
+
+        if(frame.data[0] == 99) //'c' in decimal
+        {
+          print_msg();
+          Serial.println("Calibration complete");
+          curr_state = State::calib_end;
+        }
+
+        for (int i=0; i<utils->id_ctr; i++)
+        {
+          Serial.print("k");
+          Serial.print(i);
+          Serial.print(": ");
+          Serial.println(utils->k[i]);
+        }
+      }
+  }
   //listening
   //if receives "Measure"
     //measure and save k[id_sender]

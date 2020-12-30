@@ -4,12 +4,6 @@ MCP2515 mcp2515(10); //SS pin 10
 extern can_frame_stream *cf_stream; // defined in main.cpp
 extern can_frame frame; // defined in main.cpp
 
-bool send_id_broadcast (uint8_t id) {
-	uint8_t msg[] {CAN_NEW_ID, id};
-	if(write(CAN_BROADCAST_ID, msg, 2) != MCP2515::ERROR_OK )
-		return false;
-	return true;
-}
 
 uint8_t analyse_id_broadcast (uint8_t cmd, uint8_t id, Utils *utils){
 	Serial.print("\t\tReceiving : cmd : "); Serial.print(cmd);
@@ -29,13 +23,6 @@ uint8_t analyse_id_broadcast (uint8_t cmd, uint8_t id, Utils *utils){
 			return 1;// if the id was correctly added
 	}
 	return 0;// if it is not new node, then ignore
-}
-
-bool send_sync_broadcast (uint8_t id) {
-	uint8_t msg[] {CAN_SYNC, id};
-	if(write(CAN_BROADCAST_ID, msg, 2) != MCP2515::ERROR_OK )
-		return false;
-	return true;
 }
 
 bool send_msg (uint8_t id, uint8_t my_id, uint8_t code) {

@@ -14,10 +14,9 @@
 
 //union to pack/unpack long ints into bytes
 union my_can_msg {
-unsigned long value;
-unsigned char bytes[4];
+   unsigned long value;
+   unsigned char bytes[4];
 };
-
 
 /* EXAMPLE NOT TO BE USED!!!!!
 union { // anonymous union
@@ -26,9 +25,7 @@ union { // anonymous union
    };
 */
 
-bool send_id_broadcast (uint8_t id);
 uint8_t analyse_id_broadcast (uint8_t cmd, uint8_t id, Utils *utils);
-bool send_sync_broadcast (uint8_t id);
 bool send_msg (uint8_t id, uint8_t my_id, uint8_t code);
 bool broadcast (uint8_t id, uint8_t code);
 bool wait_for_acks (uint8_t N_nodes);
