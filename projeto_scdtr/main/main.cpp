@@ -43,7 +43,6 @@ volatile unsigned long timeout{5000000};
 volatile bool has_data;
 
 volatile bool sync_recvd = false;
-volatile uint8_t ack_ctr = 0;
 
 enum class State : byte {start, send_id_broadcast, wait_for_ids, sync, calibrate, apply_control, negotiate, end}; // states of the system
 State curr_state = State::start;
@@ -134,14 +133,6 @@ void loop() {
 	case State::apply_control:
 		if (flag) {
       unsigned long init_t = micros();
-
-      if(utils->serial_read_lux()){ // command is ready to be processed
-        process_serial_input_command(utils->serial_input, utils->serial_input_index);
-        x_ref = (occupancy == true) ? occupied_lux : unoccupied_lux; // decides x_ref, depending if it is occupied or not
-        u_ff = (x_ref == 0) ? 0 : (x_ref - utils->o)/utils->k[utils->id_vec[0]]; //if x_ref = 0, u_ff = 0
-        t_i = micros();
-        v_i = utils->get_voltage();
-      }
       
       unsigned long t = micros();
       
@@ -175,8 +166,6 @@ void loop() {
       flag = 0;
       curr_state = State::negotiate;
     }
-
-    
     break;
   case State::negotiate:
     if(negotiate()){
@@ -194,8 +183,8 @@ void loop() {
 bool negotiate(){
 
   if(my_id == utils->lowest_id && step == 0){
-        send_control_msg(utils->id_vec[1], my_id, 'u', 0.5);
-        step = 1;
+    send_control_msg(utils->id_vec[1], my_id, 'u', 0.5);
+    step = 1;
   }
   if(has_data){
     print_msg();
@@ -215,6 +204,14 @@ bool negotiate(){
 
 
 void read_events() {
+  if(utils->serial_read_lux()){ // command is ready to be processed
+    process_serial_input_command(utils->serial_input, utils->serial_input_index);
+    x_ref = (occupancy == true) ? occupied_lux : unoccupied_lux; // decides x_ref, depending if it is occupied or not
+    u_ff = (x_ref == 0) ? 0 : (x_ref - utils->o)/utils->k[utils->id_vec[0]]; //if x_ref = 0, u_ff = 0
+    t_i = micros();
+    v_i = utils->get_voltage();
+  }
+    
   if(micros() - last_state_change > timeout)
     wait_event = true;
   cli(); has_data = cf_stream->get(frame); sei();
