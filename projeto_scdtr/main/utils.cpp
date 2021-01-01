@@ -9,6 +9,7 @@ Utils::Utils(){
 
   ack_ctr = 0;
   sync_sent = false;
+  o = 0;
 }
 
 bool Utils::add_id(uint8_t new_id){
