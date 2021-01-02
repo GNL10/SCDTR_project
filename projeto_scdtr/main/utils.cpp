@@ -122,7 +122,7 @@ bool Utils::isHub() {
   return false;
 }
 
-void Utils::serial_respond(const char *cmd, uint8_t id, float val){
+void Utils::serial_respond(char cmd, uint8_t id, float val){
 	Serial.print(cmd);
 	Serial.print(SPACE);
 	Serial.print(id);	
@@ -130,7 +130,7 @@ void Utils::serial_respond(const char *cmd, uint8_t id, float val){
 	Serial.println(val);
 }
 
-void Utils::serial_respond(const char *cmd, uint8_t id, int val){
+void Utils::serial_respond(char cmd, uint8_t id, int val){
 	Serial.print(cmd);
 	Serial.print(SPACE);
 	Serial.print(id);	

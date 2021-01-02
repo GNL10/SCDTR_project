@@ -1,6 +1,6 @@
 #include <math.h>
 
-#include "can_bus_comms.h"
+#include "comms.h"
 #include "can_frame_stream.h"
 #include "configs.h"
 #include "controller.h"
@@ -261,107 +261,146 @@ ISR(TIMER1_COMPA_vect) {
     flag = 1;  // notify main loop
 }
 
+uint8_t extract_num(char input[], int &idx) {
+	char l = input[idx];
+	uint8_t num = 0; 
+
+	while (l != '\0' && l != ' ' && l != '\r'){
+		num *= 10;
+		num += (l - '0'); // add one digit at a time
+		l = input[++idx];
+	}
+	idx++; //leaves idx at beginning of next num
+	return num;
+}
+
 void process_can_bus_cmd (can_frame frame){
     char msg[CAN_MAX_DLC + 1];
     
-    Serial.print("CAN BUS PROCESS : (byte*) ");
-    int i;
-    for(i = 0; i < frame.can_dlc; i++) {
+    Serial.print("CAN BUS RECEIVING : (byte*) ");
+    for(int i = 0; i < frame.can_dlc; i++) {
         Serial.print(frame.data[i]);
         Serial.print(SPACE);
         msg[i] = frame.data[i];
     }
-    msg[i] = '\0';
+    msg[frame.can_dlc] = '\0';
 	Serial.print("\t (char*) ");
     Serial.println(msg);
 
-	char *cmd = strtok(msg, SPACE);
-	
+	char cmd = msg[0];
+	char next_cmd;
+	int idx;
+	uint8_t id;
+	float_byte l;
 
 	if(utils->hub){ // if node is hub
-		char *id = strtok(NULL, SPACE);
-		if(!strcmp(cmd, CMD_ILLUM)){
-			float_byte l;
-			char *n = strtok(NULL, SPACE);
-			for(int i = 0; i < 4; i++)
-				l.bytes[i] = n[i];
-			utils->serial_respond(CMD_ILLUM, (uint8_t) id[0], l.val);
+		id = msg[2];
+		idx = 4;
+		switch (cmd) {
+		case CMD_ILLUM:
+			for(unsigned long i = 0; i < sizeof(float); i++)
+				l.bytes[i] = msg[i+idx];
+			utils->serial_respond(CMD_ILLUM, id, l.val);
+			break;
+		
+		case CMD_DUTY_CYCLE:
+			utils->serial_respond(CMD_DUTY_CYCLE, id, msg[4]); //duty cycle in %
+			break;
+
+		case CMD_OCCUPANCY:
+			utils->serial_respond(CMD_OCCUPANCY, id, msg[4]); //occupancy
+			break;
+
+		case CMD_OCCUPIED_ILLUM:
+			for(unsigned long i = 0; i < sizeof(float); i++)
+				l.bytes[i] = msg[i+idx];
+			utils->serial_respond(CMD_OCCUPIED_ILLUM, id, l.val); // illuminance at ocuppied state
+			break;
+
+		case CMD_UNOCCUPIED_ILLUM:
+			for(unsigned long i = 0; i < sizeof(float); i++)
+				l.bytes[i] = msg[i+idx];
+			utils->serial_respond(CMD_UNOCCUPIED_ILLUM, id, l.val); // illuminance at ocuppied state
+			break;
+		// missing cases here
+
+		default:
+			break;
 		}
 	}
     
-    if(!strcmp(cmd, CMD_GET)){
-		Serial.println("GET COMMAND");
-        char *next_cmd = strtok(NULL, SPACE);
-        char *id = strtok(NULL, SPACE);
-        if(!strcmp(next_cmd, CMD_ILLUM)){ // responding with current illuminance
-			Serial.println("ILUMM COMMAND");
-			can_bus_send_response(atoi(id), CMD_ILLUM, utils->id_vec[0], 123.456);//utils->calc_lux());
-        }
-    }
+	switch (cmd) {
+	case CMD_GET:
+        next_cmd = msg[2];
+        id = msg[4];
+		switch (next_cmd) {
+		case CMD_ILLUM:
+			can_bus_send_response(id, CMD_ILLUM, utils->id_vec[0], 123.456);//utils->calc_lux());
+			break;
+		
+		default:
+			break;
+		}
+		break;
+	default:
+		break;
+	}
 }
 
 
-void cmd_get() {
-	char *next_cmd = strtok(NULL, SPACE);
-	char *id = strtok(NULL, SPACE);
 
-	if (!strcmp(next_cmd, CMD_ILLUM)) { //Get current measured illuminance at desk <i>
-		if(atoi(id) == utils->id_vec[0]) // if this is the node being asked
-            utils->serial_respond(CMD_ILLUM, utils->id_vec[0], utils->calc_lux());
+void cmd_get(char serial_input[]) {		//          012345
+	char next_cmd = serial_input[2]; 	// example:<g l 12>
+	int idx = 4;
+	uint8_t id = extract_num(serial_input, idx);
+	switch (next_cmd) {
+	case CMD_ILLUM: //Get current measured illuminance at desk <i>
+		if(id == utils->id_vec[0]) // if this is the node being asked
+            utils->serial_respond(CMD_ILLUM, id, utils->calc_lux());
 		else // send the msg to the node
-			can_bus_send_cmd(atoi(id), CMD_GET, CMD_ILLUM, utils->id_vec[0]);
-	}
+			can_bus_send_cmd(id, CMD_GET, CMD_ILLUM, utils->id_vec[0]);
+		break;
 
-	else if (!strcmp(next_cmd, CMD_DUTY_CYCLE)) {
-		if(atoi(id) == utils->id_vec[0]) // if this is the node being asked
-            utils->serial_respond(CMD_DUTY_CYCLE, utils->id_vec[0], u_sat);
+	case CMD_DUTY_CYCLE:
+		if(id == utils->id_vec[0]) // if this is the node being asked
+			utils->serial_respond(CMD_DUTY_CYCLE, utils->id_vec[0], u_sat);
 		else
-			can_bus_send_cmd(atoi(id), CMD_GET, CMD_DUTY_CYCLE, utils->id_vec[0]);
-	}
-
-	else if (!strcmp(next_cmd, CMD_OCCUPANCY)) {
-		if(atoi(id) == utils->id_vec[0]) // if this is the node being asked
-			utils->serial_respond(CMD_OCCUPANCY, utils->id_vec[0], (int)occupancy);
+			can_bus_send_cmd(id, CMD_GET, CMD_DUTY_CYCLE, utils->id_vec[0]);
+		break;
+	
+	case CMD_OCCUPANCY:
+		if(id == utils->id_vec[0]) // if this is the node being asked
+			utils->serial_respond(CMD_OCCUPANCY, id, (int)occupancy);
 		else
-			can_bus_send_cmd(atoi(id), CMD_GET, CMD_OCCUPANCY, utils->id_vec[0]);
-	}
+			can_bus_send_cmd(id, CMD_GET, CMD_OCCUPANCY, utils->id_vec[0]);
+		break;
 
-	else if (!strcmp(next_cmd, CMD_OCCUPIED_ILLUM)) {
-
-	}
-	else if (!strcmp(next_cmd, CMD_UNOCCUPIED_ILLUM)) {
-
-	}
-	else if (!strcmp(next_cmd, CMD_ILLUM_LB)) {
-	
-	}
-	else if (!strcmp(next_cmd, CMD_EXT_ILLUM)) {
-	
-	}
-	else if (!strcmp(next_cmd, CMD_CONTROL_REF)) {
-	
-	}
-	else if (!strcmp(next_cmd, CMD_ENERGY_COST)) {
-	
-	}
-	else if (!strcmp(next_cmd, CMD_POWER_CONSUPTION)) {
-	
-	}
-	else if (!strcmp(next_cmd, CMD_TIME)) {
-	
-	}
-	else if (!strcmp(next_cmd, CMD_ACCUM_ENERGY)) {
-	
-	}
-	else if (!strcmp(next_cmd, CMD_VISIBILITY_ERR)) {
-	
-	}
-	else if (!strcmp(next_cmd, CMD_FLICKER_ERR)) {
-	
-	}
-	else {
+	case CMD_OCCUPIED_ILLUM:
+		break;
+	case CMD_UNOCCUPIED_ILLUM:
+		break;
+	case CMD_ILLUM_LB:
+		break;
+	case CMD_EXT_ILLUM:
+		break;
+	case CMD_CONTROL_REF:
+		break;
+	case CMD_ENERGY_COST:
+		break;
+	case CMD_POWER_CONSUPTION:
+		break;
+	case CMD_TIME:
+		break;
+	case CMD_ACCUM_ENERGY:
+		break;
+	case CMD_VISIBILITY_ERR:
+		break;
+	case CMD_FLICKER_ERR:
+		break;
+	default:
 		Serial.println("Invalid command!");
-	}           
+		break;
+	}
 }
 
 /**
@@ -369,45 +408,38 @@ void cmd_get() {
  * Changes occupancy and lower bound values according to command
  */
 void process_serial_input_command(char serial_input[], int &idx) {
-	char *command = strtok(serial_input, SPACE); // first part of command
+	char command = serial_input[0]; // first part of command
 
-	if (!strcmp(command, CMD_GET)) { // get parameter
-		cmd_get();
-	}
-	else if (!strcmp(command, CMD_OCCUPANCY)) { // set occupancy
-
-	}
-	else if (!strcmp(command, CMD_OCCUPIED_ILLUM)) { // Set lower bound on illuminance for Occupied state at desk <i>
-		
-	}
-	else if (!strcmp(command, CMD_UNOCCUPIED_ILLUM)) { // Set lower bound on illuminance for Unccupied state at desk <i>
-		
-	}
-	else if (!strcmp(command, CMD_ENERGY_COST)) { // Set current energy cost at desk <i>
-		
-	}
-	else if (!strcmp(command, CMD_RESET)) { // Restart system
-		
-	}
-	else
-		Serial.println("Invalid command!");
-    
+	switch (command) {
+	case CMD_GET: // get parameter
+		cmd_get(serial_input);
+		break;
 	
-	idx = 0;
+	case CMD_OCCUPANCY: // set occupancy
 
-	/* TODO to remove
-    if (strcmp(command, "o") == 0) {  // SET OCCUPANCY
-        int val = atoi(strtok(0, " "));
-        if (val == 0) {
-            occupancy = false;  // set occupancy state to unoccupied
-        } else if (val == 1) {
-            occupancy = true;  // set occupancy state to occupied
-        }
-    } else if (strcmp(command, "O") == 0) {  // SET LOWER BOUND FOR OCCUPIED
-        occupied_lux = atof(strtok(0, " "));
-    } else if (strcmp(command, "U") == 0) {  // SET LOWER BOUND FOR UNOCCUPIED
-        unoccupied_lux = atof(strtok(0, " "));
-    }*/
+		break;
+	
+	case CMD_OCCUPIED_ILLUM: // Set lower bound on illuminance for Occupied state at desk <i>
+	
+		break;
+	
+	case CMD_UNOCCUPIED_ILLUM: // Set lower bound on illuminance for Unccupied state at desk <i>
+	
+		break;
+
+	case CMD_ENERGY_COST: // Set current energy cost at desk <i>
+	
+		break;
+	
+	case CMD_RESET: // Restart system
+		
+		break;
+
+	default:
+		Serial.println("Invalid command!");
+		break;
+	}	
+	idx = 0;
 }
 
 void control_interrupt_setup() {
