@@ -1,3 +1,5 @@
+NODE ID CAN NOT BE 0, because we are sending id as char in can bus 
+
 Mask and filter basic ideas:
     for node with ID 1
 

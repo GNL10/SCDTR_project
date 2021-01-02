@@ -4,6 +4,35 @@ MCP2515 mcp2515(10); //SS pin 10
 extern can_frame_stream *cf_stream; // defined in main.cpp
 extern can_frame frame; // defined in main.cpp
 
+void can_bus_send_response(uint8_t id, const char* cmd1, uint8_t own_id, float val){
+	char can_msg[CAN_MAX_DLEN];
+	float_byte f;
+
+    sprintf(can_msg, "%s %c ", CMD_ILLUM, (char) own_id);
+	
+	f.val = val;
+	for(int i = 0; i < 4; i++)
+		can_msg[4+i] = f.bytes[i];
+
+	Serial.print("CANBUS SENDING : ");
+	for(int i = 0; i < 8; i++) {
+		Serial.print((uint8_t) can_msg[i]);
+		Serial.print(SPACE);
+	}
+	Serial.println();
+	if (write(id, (uint8_t *) can_msg, 8) != MCP2515::ERROR_OK)  // respond to id who asked
+		Serial.println(TX_BUF_FULL_ERR);
+}
+
+void can_bus_send_cmd(uint8_t id, const char* cmd1, const char* cmd2, uint8_t own_id){
+    char msg[CAN_MAX_DLEN];
+    sprintf(msg, "%s %s %c", cmd1, cmd2, own_id); // sending id as char!!
+    Serial.print("Sending msg : "); Serial.print(msg); 
+    Serial.print("\tto node : "); Serial.println(id);
+    if (write(id, (uint8_t *) msg, strlen(msg)) != MCP2515::ERROR_OK)  // send its own id
+        Serial.println(TX_BUF_FULL_ERR);
+}
+
 bool send_msg (uint8_t id, uint8_t my_id, uint8_t code) {
     uint8_t msg[] {code, my_id};
     if(write(id, msg, sizeof(msg)) != MCP2515::ERROR_OK )

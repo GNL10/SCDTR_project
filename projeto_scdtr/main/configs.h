@@ -17,6 +17,25 @@ const float K2 = 0.5;//0.5;//0.1;  // Integrator gain
 const float error_margin = 0.5;//0.20;    // Margin of error to be ignored
 
 
+/* SERIAL COMMANDS */
+#define SPACE " "
+#define CMD_GET "g"
+#define CMD_ILLUM "l"
+#define CMD_DUTY_CYCLE "d"
+#define CMD_OCCUPANCY "o"
+#define CMD_OCCUPIED_ILLUM "O"
+#define CMD_UNOCCUPIED_ILLUM "U"
+#define CMD_ILLUM_LB "L" // lower bound
+#define CMD_EXT_ILLUM "x"
+#define CMD_CONTROL_REF "r"
+#define CMD_ENERGY_COST "c"
+#define CMD_POWER_CONSUPTION "p"
+#define CMD_TOTAL "T"
+#define CMD_TIME "t"
+#define CMD_ACCUM_ENERGY "e"
+#define CMD_VISIBILITY_ERR "v"
+#define CMD_FLICKER_ERR "f"
+#define CMD_RESET "r"
 
 
 #endif

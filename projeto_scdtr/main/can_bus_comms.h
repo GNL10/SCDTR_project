@@ -6,7 +6,7 @@
 
 #define TX_BUF_FULL_ERR "\t\t\t\tMCP2515 TX Buf Full"
 
-#define WAIT_ID_TIME (unsigned long) 4000000
+#define WAIT_ID_TIME (unsigned long) 2000000
 #define  WAIT_ACK_TIME (unsigned long) 100000000
 
 #define CAN_BROADCAST_ID (uint32_t) 0x000007FF
@@ -20,6 +20,13 @@ union my_can_msg {
    unsigned char bytes[4];
 };
 
+typedef union{
+    float val;
+    char bytes[4];
+} float_byte;
+
+void can_bus_send_response(uint8_t id, const char* cmd1, uint8_t own_id, float val);
+void can_bus_send_cmd(uint8_t id, const char* cmd1, const char* cmd2, uint8_t own_id);
 bool send_msg (uint8_t id, uint8_t my_id, uint8_t code);
 bool broadcast (uint8_t id, uint8_t code);
 //bool wait_for_acks (uint8_t N_nodes);

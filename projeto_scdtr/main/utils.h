@@ -5,7 +5,7 @@
 #include "configs.h"
 #include "can_bus_comms.h"
 
-#define HUB_WAIT_TIME (long) 3000000
+#define HUB_WAIT_TIME (long) 1000000
 #define LED_WAIT_TIME (unsigned long) 500 
 #define MEASURE_WAIT_TIME (unsigned long ) 200
 
@@ -35,6 +35,8 @@ public:
 	float calc_lux ();
   float get_voltage();
   void calc_gain (uint8_t sender_id);
+  void serial_respond(const char *cmd, uint8_t id, float val);
+  void serial_respond(const char *cmd, uint8_t id, int val);
 
   uint8_t analyse_id_broadcast (uint8_t cmd, uint8_t id);
 

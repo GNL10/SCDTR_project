@@ -122,6 +122,22 @@ bool Utils::isHub() {
   return false;
 }
 
+void Utils::serial_respond(const char *cmd, uint8_t id, float val){
+	Serial.print(cmd);
+	Serial.print(SPACE);
+	Serial.print(id);	
+	Serial.print(SPACE);
+	Serial.println(val);
+}
+
+void Utils::serial_respond(const char *cmd, uint8_t id, int val){
+	Serial.print(cmd);
+	Serial.print(SPACE);
+	Serial.print(id);	
+	Serial.print(SPACE);
+	Serial.println(val);
+}
+
 void Utils::calc_gain (uint8_t sender_id) {
   int d = 255;
 
