@@ -6,6 +6,7 @@
 #include "controller.h"
 #include "simulator.h"
 #include "utils.h"
+#include "consensus.h"
 
 // can bus comms
 can_frame_stream *cf_stream = new can_frame_stream();
@@ -34,6 +35,7 @@ volatile float unoccupied_lux = 20;
 Utils *utils;
 Simulator *sim;
 Controller *ctrl;
+Consensus *consensus;
 
 volatile bool flag = true;
 unsigned long last_state_change{0};
@@ -187,7 +189,11 @@ void loop() {
 }
 
 bool negotiate() {
+    float d[utils->id_ctr];
+
     if (utils->my_id == utils->lowest_id && step == 0) {
+        consensus->iterate(d);
+
         comms::send_control_msg(utils->id_vec[1], utils->my_id, 'u', 0.5);
         step = 1;
     }
