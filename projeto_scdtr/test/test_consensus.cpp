@@ -12,11 +12,25 @@ int cost_1 = 1, cost_2 = 1;
 // asymmetric costs
 //int cost_1 = 1, cost_2 = 3;
 
-void setup(){
+float k11 = 2, k12 = 1;
+float gains[] {k11, k12};
 
+Consensus* node1;
+
+void setup(){
+Serial.begin(115200);
 }
 
 void loop(){
 
+node1 = new Consensus(0, L1, o1, gains, cost_1);
+
+float d[] {1, 1} ;
+int len = 2; 
+float* cost;
+node1->evaluate_cost(d, len, cost);
+Serial.print("cost: ");
+Serial.println(*cost);
+delay(5000);
 
 }

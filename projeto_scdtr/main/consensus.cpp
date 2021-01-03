@@ -1,5 +1,6 @@
 #include "consensus.h"
 #include "node.h"
+#include "op.h"
 #include <math.h>
 
 Consensus::Consensus(uint8_t id_node, float des_lux, float res_lux, float* gains, float cost){
@@ -20,12 +21,22 @@ c[0] = cost; c[1] = 0;
 
 }
 
-float Consensus::evaluate_cost(float* d){
-    float res = sub(d-d_av);
-    return mul(c, d) + mul(y, res) + rho/2*pow(norm(res), 2);
+void Consensus::evaluate_cost(float* d, int len, float* cost){
+    float res_sub[len], res_mul;
+
+    op::sub(d, d_av, len, res_sub);
+    op::mul(y, res_sub, 1, len, 1, &res_mul);
+    *cost = res_mul;
+    op::mul(c, d, 1, len, 1, &res_mul);
+    *cost = *cost + res_mul + rho/2*pow(norm(res_sub), 2);
+    float c = rho/2*pow(norm(res_sub), 2);
+    Serial.println(res_sub[0]);
+    Serial.println(res_sub[1]);
+    
+
 } 
 
-bool Consensus::check_feasibility(float* d){
+/*bool Consensus::check_feasibility(float* d){
     float tol = 0.001;
     if(d[id] < 0-tol) return 0;
     if(d[id] > 100+tol) return 0;
@@ -59,12 +70,12 @@ float* Consensus::iterate(){
         
     }
 
-}
+}*/
 
 float Consensus::norm (float* v){
     float n = 0;
     for (int i = 0; i < sizeof(v)/sizeof(float*); i++){
-        n += v[i]*v[i];
+        n += pow(v[i], 2);
     }
     return sqrt(n);
 }

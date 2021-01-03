@@ -18,8 +18,8 @@ public:
     float L;
 
   Consensus(uint8_t id_node, float des_lux, float res_lux, float* gains, float cost);
-  float evaluate_cost(float* d);
+  void evaluate_cost(float* d, int len, float* cost);
   bool check_feasibility(float* d);
   void iterate();
-  float Consensus::norm(float* v);
+  float norm(float* v);
 };
