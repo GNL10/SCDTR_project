@@ -4,7 +4,7 @@ MCP2515 mcp2515(10); //SS pin 10
 extern can_frame_stream *cf_stream; // defined in main.cpp
 extern can_frame frame; // defined in main.cpp
 
-void can_bus_send_response(uint8_t id, char cmd1, uint8_t own_id, float val){
+void comms::can_bus_send_response(uint8_t id, char cmd1, uint8_t own_id, float val){
 	char can_msg[CAN_MAX_DLEN];
 	float_byte f;
 
@@ -25,7 +25,7 @@ void can_bus_send_response(uint8_t id, char cmd1, uint8_t own_id, float val){
 		Serial.println(TX_BUF_FULL_ERR);
 }
 
-void can_bus_send_cmd(uint8_t id, char cmd1, char cmd2, uint8_t own_id){
+void comms::can_bus_send_cmd(uint8_t id, char cmd1, char cmd2, uint8_t own_id){
     char msg[CAN_MAX_DLEN];
     sprintf(msg, "%c %c %c", cmd1, cmd2, own_id); // sending id as char!!
     Serial.print("Sending msg : "); Serial.print(msg); 
@@ -34,14 +34,14 @@ void can_bus_send_cmd(uint8_t id, char cmd1, char cmd2, uint8_t own_id){
         Serial.println(TX_BUF_FULL_ERR);
 }
 
-bool send_msg (uint8_t id, uint8_t my_id, uint8_t code) {
+bool comms::send_msg (uint8_t id, uint8_t my_id, uint8_t code) {
     uint8_t msg[] {code, my_id};
     if(write(id, msg, sizeof(msg)) != MCP2515::ERROR_OK )
         return false;
     return true;
 }
 
-bool send_control_msg(uint8_t id, uint8_t my_id, uint8_t code, float u){
+bool comms::send_control_msg(uint8_t id, uint8_t my_id, uint8_t code, float u){
     my_can_msg m;
     m.value = u;
     uint8_t msg[6];
@@ -54,7 +54,7 @@ bool send_control_msg(uint8_t id, uint8_t my_id, uint8_t code, float u){
     return true;
 }
 
-bool broadcast (uint8_t id, uint8_t code) { //make it general
+bool comms::broadcast (uint8_t id, uint8_t code) { //make it general
     uint8_t msg[] {code, id};
 
     if(write(CAN_BROADCAST_ID, msg, sizeof(msg)) != MCP2515::ERROR_OK )
@@ -62,7 +62,7 @@ bool broadcast (uint8_t id, uint8_t code) { //make it general
     return true;
 }
 
-void print_msg () {
+void comms::print_msg () {
 
     Serial.print("\t\tReceiving : cmd : "); Serial.print((char)frame.data[0]);
 	Serial.print(" ID : "); Serial.print(frame.data[1]);
@@ -78,7 +78,7 @@ void print_msg () {
     Serial.println();
 }
 
-MCP2515::ERROR write(uint32_t id, uint8_t bytes[], uint8_t n_bytes) {
+MCP2515::ERROR comms::write(uint32_t id, uint8_t bytes[], uint8_t n_bytes) {
 	can_frame frame;
 	frame.can_id = id;
 	frame.can_dlc = n_bytes;
@@ -87,6 +87,22 @@ MCP2515::ERROR write(uint32_t id, uint8_t bytes[], uint8_t n_bytes) {
 	
 	//send data
 	return mcp2515.sendMessage(&frame);
+}
+
+void comms::serial_respond(char cmd, uint8_t id, float val){
+	Serial.print(cmd);
+	Serial.print(SPACE);
+	Serial.print(id);	
+	Serial.print(SPACE);
+	Serial.println(val);
+}
+
+void comms::serial_respond(char cmd, uint8_t id, int val){
+	Serial.print(cmd);
+	Serial.print(SPACE);
+	Serial.print(id);	
+	Serial.print(SPACE);
+	Serial.println(val);
 }
 
 /*MCP2515::ERROR write(uint32_t id, uint32_t val, uint8_t n_bytes) {

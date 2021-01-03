@@ -122,22 +122,6 @@ bool Utils::isHub() {
   return false;
 }
 
-void Utils::serial_respond(char cmd, uint8_t id, float val){
-	Serial.print(cmd);
-	Serial.print(SPACE);
-	Serial.print(id);	
-	Serial.print(SPACE);
-	Serial.println(val);
-}
-
-void Utils::serial_respond(char cmd, uint8_t id, int val){
-	Serial.print(cmd);
-	Serial.print(SPACE);
-	Serial.print(id);	
-	Serial.print(SPACE);
-	Serial.println(val);
-}
-
 void Utils::calc_gain (uint8_t sender_id) {
   int d = 255;
 
@@ -181,7 +165,7 @@ bool Utils::sync (bool has_data, can_frame &frame, bool sync_recvd) {
   if(lowest_id == id_vec[0]){ //if this is lowest id
     if(!sync_sent){
       sync_sent = true;
-      if(!broadcast(id_vec[0], CAN_SYNC)) // send its own id
+      if(!comms::broadcast(id_vec[0], CAN_SYNC)) // send its own id
         Serial.println(TX_BUF_FULL_ERR);
     }                                            
     else {
@@ -195,7 +179,7 @@ bool Utils::sync (bool has_data, can_frame &frame, bool sync_recvd) {
   }
   else{ // normal node, waits for CAN_SYNC msg
     if(sync_recvd){
-      if(!send_msg(frame.data[1], id_vec[0], CAN_ACK))
+      if(!comms::send_msg(frame.data[1], id_vec[0], CAN_ACK))
         Serial.println(TX_BUF_FULL_ERR);
         return true;
     }
@@ -208,7 +192,7 @@ bool Utils::calibrate (bool has_data, can_frame &frame) {
   if(id_vec[0] == lowest_id) {
     calc_residual_lux();
 
-    if(!broadcast(id_vec[0], 'r')) //broadcast "Measure Residual Lux"+my_id
+    if(!comms::broadcast(id_vec[0], 'r')) //broadcast "Measure Residual Lux"+my_id
         Serial.println(TX_BUF_FULL_ERR);
 
     analogWrite(LED_PIN, 255); //Light on
@@ -216,7 +200,7 @@ bool Utils::calibrate (bool has_data, can_frame &frame) {
 
     calc_gain(id_vec[0]);
 
-    if(!broadcast(id_vec[0], 'm')) //broadcast "Measure"+my_id
+    if(!comms::broadcast(id_vec[0], 'm')) //broadcast "Measure"+my_id
         Serial.println(TX_BUF_FULL_ERR);
     delay(MEASURE_WAIT_TIME);
     Serial.println("Light off");
@@ -224,22 +208,22 @@ bool Utils::calibrate (bool has_data, can_frame &frame) {
 
     for(int i = 1; i< id_ctr; i++)
     {     
-      if(!send_msg(id_vec[i], id_vec[0], 'l')) //send "Light on"
+      if(!comms::send_msg(id_vec[i], id_vec[0], 'l')) //send "Light on"
         Serial.println(TX_BUF_FULL_ERR);
       delay(LED_WAIT_TIME);
 
       calc_gain(id_vec[i]);
 
-      if(!broadcast(id_vec[i], 'm')) //broadcast "Measure"+id
+      if(!comms::broadcast(id_vec[i], 'm')) //broadcast "Measure"+id
         Serial.println(TX_BUF_FULL_ERR);
     
       delay(MEASURE_WAIT_TIME);
-      if(!send_msg(id_vec[i], id_vec[0], 'o')) //send "Light off"
+      if(!comms::send_msg(id_vec[i], id_vec[0], 'o')) //send "Light off"
         Serial.println(TX_BUF_FULL_ERR);
     }
 
     Serial.println("Broadcast calibration complete");
-    if(!broadcast(id_vec[0], 'c')) //broadcast "Calibration Complete"
+    if(!comms::broadcast(id_vec[0], 'c')) //broadcast "Calibration Complete"
         Serial.println(TX_BUF_FULL_ERR);
 
     for (int i=0; i < id_ctr; i++) {
@@ -255,7 +239,7 @@ bool Utils::calibrate (bool has_data, can_frame &frame) {
   else{
     if (has_data) 
     {
-      print_msg();
+      comms::print_msg();
       if(frame.data[0] == 114) //'r' in decimal
       {
         Serial.println("Calculating residual lux."); 

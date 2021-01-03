@@ -36,6 +36,7 @@ const float error_margin = 0.5;//0.20;    // Margin of error to be ignored
 #define CMD_VISIBILITY_ERR 'v'
 #define CMD_FLICKER_ERR 'f'
 #define CMD_RESET 'r'
+#define CMD_ACK 'A'
 
 
 #endif

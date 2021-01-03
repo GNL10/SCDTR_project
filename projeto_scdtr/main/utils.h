@@ -25,7 +25,7 @@ public:
   bool sync_sent;
 
   char serial_input[SERIAL_INPUT_SIZE+1];
-  int serial_input_index = 0;
+  uint8_t serial_input_index = 0;
 
   Utils();
   bool add_id(uint8_t new_id);

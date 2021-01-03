@@ -25,13 +25,17 @@ typedef union{
     char bytes[4];
 } float_byte;
 
+namespace comms {
+    void can_bus_send_response(uint8_t id, char cmd1, uint8_t own_id, float val);
+    void can_bus_send_cmd(uint8_t id, char cmd1, char cmd2, uint8_t own_id);
+    bool send_msg (uint8_t id, uint8_t my_id, uint8_t code);
+    bool broadcast (uint8_t id, uint8_t code);
+    //bool wait_for_acks (uint8_t N_nodes);
+    bool send_control_msg(uint8_t id, uint8_t my_id, uint8_t code, float u);
+    void print_msg ();
+    MCP2515::ERROR write(uint32_t id, uint8_t bytes[], uint8_t n_bytes);
+    void serial_respond(char cmd, uint8_t id, float val);
+    void serial_respond(char cmd, uint8_t id, int val);
 
-void can_bus_send_response(uint8_t id, char cmd1, uint8_t own_id, float val);
-void can_bus_send_cmd(uint8_t id, char cmd1, char cmd2, uint8_t own_id);
-bool send_msg (uint8_t id, uint8_t my_id, uint8_t code);
-bool broadcast (uint8_t id, uint8_t code);
-//bool wait_for_acks (uint8_t N_nodes);
-bool send_control_msg(uint8_t id, uint8_t my_id, uint8_t code, float u);
-void print_msg ();
-MCP2515::ERROR write(uint32_t id, uint8_t bytes[], uint8_t n_bytes);
+}
 #endif

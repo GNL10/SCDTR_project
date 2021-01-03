@@ -62,7 +62,7 @@ ISR(TIMER1_COMPA_vect);
 
 void read_events();
 void process_can_bus_cmd (can_frame frame);
-void process_serial_input_command(char serial_input[], int &idx);
+void process_serial_input_command(char serial_input[], uint8_t &idx);
 void irqHandler();
 void control_interrupt_setup();
 void can_bus_setup();
@@ -102,7 +102,7 @@ void loop() {
         case State::send_id_broadcast:
             Serial.print("Sending broadcast with ID : ");
             Serial.println(utils->id_vec[0]);
-            if (!broadcast(my_id, CAN_NEW_ID))  // send its own id
+            if (!comms::broadcast(my_id, CAN_NEW_ID))  // send its own id
                 Serial.println(TX_BUF_FULL_ERR);
 
             last_state_change = micros();
@@ -189,18 +189,18 @@ void loop() {
 
 bool negotiate() {
     if (my_id == utils->lowest_id && step == 0) {
-        send_control_msg(utils->id_vec[1], my_id, 'u', 0.5);
+        comms::send_control_msg(utils->id_vec[1], my_id, 'u', 0.5);
         step = 1;
     }
     if (has_data) {
-        print_msg();
+        comms::print_msg();
         Serial.println("Calculating u");
         my_can_msg rcv_u;
         for (int i = 2; i < 6; i++)  // prepare can message
             rcv_u.bytes[i - 2] = frame.data[i];
         Serial.print("float received: ");
         Serial.println(rcv_u.value);
-        send_control_msg(utils->id_vec[1], my_id, 'u', 0.5);
+        comms::send_control_msg(utils->id_vec[1], my_id, 'u', 0.5);
         return true;
     }
 
@@ -261,7 +261,7 @@ ISR(TIMER1_COMPA_vect) {
     flag = 1;  // notify main loop
 }
 
-uint8_t extract_num(char input[], int &idx) {
+uint8_t extract_num(char input[], uint8_t &idx) {
 	char l = input[idx];
 	uint8_t num = 0; 
 
@@ -300,27 +300,27 @@ void process_can_bus_cmd (can_frame frame){
 		case CMD_ILLUM:
 			for(unsigned long i = 0; i < sizeof(float); i++)
 				l.bytes[i] = msg[i+idx];
-			utils->serial_respond(CMD_ILLUM, id, l.val);
+			comms::serial_respond(CMD_ILLUM, id, l.val);
 			break;
 		
 		case CMD_DUTY_CYCLE:
-			utils->serial_respond(CMD_DUTY_CYCLE, id, msg[4]); //duty cycle in %
+			comms::serial_respond(CMD_DUTY_CYCLE, id, msg[4]); //duty cycle in %
 			break;
 
 		case CMD_OCCUPANCY:
-			utils->serial_respond(CMD_OCCUPANCY, id, msg[4]); //occupancy
+			comms::serial_respond(CMD_OCCUPANCY, id, msg[4]); //occupancy
 			break;
 
 		case CMD_OCCUPIED_ILLUM:
 			for(unsigned long i = 0; i < sizeof(float); i++)
 				l.bytes[i] = msg[i+idx];
-			utils->serial_respond(CMD_OCCUPIED_ILLUM, id, l.val); // illuminance at ocuppied state
+			comms::serial_respond(CMD_OCCUPIED_ILLUM, id, l.val); // illuminance at ocuppied state
 			break;
 
 		case CMD_UNOCCUPIED_ILLUM:
 			for(unsigned long i = 0; i < sizeof(float); i++)
 				l.bytes[i] = msg[i+idx];
-			utils->serial_respond(CMD_UNOCCUPIED_ILLUM, id, l.val); // illuminance at ocuppied state
+			comms::serial_respond(CMD_UNOCCUPIED_ILLUM, id, l.val); // illuminance at ocuppied state
 			break;
 		// missing cases here
 
@@ -335,7 +335,7 @@ void process_can_bus_cmd (can_frame frame){
         id = msg[4];
 		switch (next_cmd) {
 		case CMD_ILLUM:
-			can_bus_send_response(id, CMD_ILLUM, utils->id_vec[0], 123.456);//utils->calc_lux());
+			comms::can_bus_send_response(id, CMD_ILLUM, utils->id_vec[0], 123.456);//utils->calc_lux());
 			break;
 		
 		default:
@@ -351,28 +351,29 @@ void process_can_bus_cmd (can_frame frame){
 
 void cmd_get(char serial_input[]) {		//          012345
 	char next_cmd = serial_input[2]; 	// example:<g l 12>
-	int idx = 4;
+	uint8_t idx = 4;
 	uint8_t id = extract_num(serial_input, idx);
+
 	switch (next_cmd) {
 	case CMD_ILLUM: //Get current measured illuminance at desk <i>
 		if(id == utils->id_vec[0]) // if this is the node being asked
-            utils->serial_respond(CMD_ILLUM, id, utils->calc_lux());
+            comms::serial_respond(CMD_ILLUM, id, utils->calc_lux());
 		else // send the msg to the node
-			can_bus_send_cmd(id, CMD_GET, CMD_ILLUM, utils->id_vec[0]);
+			comms::can_bus_send_cmd(id, CMD_GET, CMD_ILLUM, utils->id_vec[0]);
 		break;
 
 	case CMD_DUTY_CYCLE:
 		if(id == utils->id_vec[0]) // if this is the node being asked
-			utils->serial_respond(CMD_DUTY_CYCLE, utils->id_vec[0], u_sat);
+			comms::serial_respond(CMD_DUTY_CYCLE, utils->id_vec[0], u_sat);
 		else
-			can_bus_send_cmd(id, CMD_GET, CMD_DUTY_CYCLE, utils->id_vec[0]);
+			comms::can_bus_send_cmd(id, CMD_GET, CMD_DUTY_CYCLE, utils->id_vec[0]);
 		break;
 	
 	case CMD_OCCUPANCY:
 		if(id == utils->id_vec[0]) // if this is the node being asked
-			utils->serial_respond(CMD_OCCUPANCY, id, (int)occupancy);
+			comms::serial_respond(CMD_OCCUPANCY, id, (int)occupancy);
 		else
-			can_bus_send_cmd(id, CMD_GET, CMD_OCCUPANCY, utils->id_vec[0]);
+			comms::can_bus_send_cmd(id, CMD_GET, CMD_OCCUPANCY, utils->id_vec[0]);
 		break;
 
 	case CMD_OCCUPIED_ILLUM:
@@ -407,8 +408,9 @@ void cmd_get(char serial_input[]) {		//          012345
  * Processes the command entered in the serial_input variable
  * Changes occupancy and lower bound values according to command
  */
-void process_serial_input_command(char serial_input[], int &idx) {
+void process_serial_input_command(char serial_input[], uint8_t &idx) {
 	char command = serial_input[0]; // first part of command
+	uint8_t id, aux_idx = 2;
 
 	switch (command) {
 	case CMD_GET: // get parameter
@@ -416,7 +418,14 @@ void process_serial_input_command(char serial_input[], int &idx) {
 		break;
 	
 	case CMD_OCCUPANCY: // set occupancy
-
+        id = extract_num(serial_input, aux_idx);
+        if(id == utils->id_vec[0]){
+            occupancy = (serial_input[aux_idx] == '0') ? false : true;
+            Serial.println("ACK");
+        }
+        else 
+            comms::can_bus_send_cmd(id, CMD_OCCUPANCY, utils->id_vec[0], (serial_input[aux_idx] == '0') ? 0 : 1);
+         
 		break;
 	
 	case CMD_OCCUPIED_ILLUM: // Set lower bound on illuminance for Occupied state at desk <i>
@@ -432,7 +441,7 @@ void process_serial_input_command(char serial_input[], int &idx) {
 		break;
 	
 	case CMD_RESET: // Restart system
-		
+		// go to reset or start state
 		break;
 
 	default:
