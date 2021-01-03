@@ -287,12 +287,11 @@ float extract_float(char input[], uint8_t &idx){
     
     while (l != '\0' && l != ' ' && l != '\r'){
 		if(l == '.'){
-            Serial.println("FOUND POINT");
             point = true;
+            l = input[++idx];
             continue;
         }
         if(point == true) {
-            Serial.println("FOUND POINT");
             num += dec*(l - '0');
             dec *= 0.1; //decrease the decimal by another x10
         } 
@@ -300,8 +299,6 @@ float extract_float(char input[], uint8_t &idx){
             num *= 10;
 		    num += (l - '0'); // add one digit at a time
         }
-        Serial.print("NUMBER : "); Serial.println(num);
-
 		l = input[++idx];
 	}
 	idx++; //leaves idx at beginning of next num
@@ -468,6 +465,7 @@ void process_serial_input_command(char serial_input[], uint8_t &idx) {
 		break;
 	
 	case CMD_OCCUPIED_ILLUM: // Set lower bound on illuminance for Occupied state at desk <i>
+        id = extract_uint8_t(serial_input, aux_idx);
         val = extract_float(serial_input, aux_idx);
         Serial.print("FLOAT VALUE : "); Serial.println(val);
 		break;
