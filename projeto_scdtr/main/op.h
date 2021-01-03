@@ -7,6 +7,7 @@ namespace op {
     void sub (float *a, float *b, int len, float *res);
     void mul (float *a, float *b, int a_rows, int a_cols, int b_cols, float *res);
     void copy (float *a, float *b, int rows, int cols);
+    void scalar_mul (float a, float *b, int b_rows, int b_cols, float *res);
 };
 
 

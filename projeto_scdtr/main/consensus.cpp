@@ -201,9 +201,5 @@ void Consensus::compute_y(float* d){
     op::sum(y, res, len, y);
 }
 
-void Consensus::rcv_solution(){
-
-}
-
 
 
