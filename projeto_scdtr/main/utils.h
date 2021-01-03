@@ -3,7 +3,7 @@
 
 #include <Arduino.h>
 #include "configs.h"
-#include "comms.h"
+#include "can_frame_stream.h"
 
 #define HUB_WAIT_TIME (long) 1000000
 #define LED_WAIT_TIME (unsigned long) 500 

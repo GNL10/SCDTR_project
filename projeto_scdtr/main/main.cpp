@@ -11,7 +11,7 @@
 can_frame_stream *cf_stream = new can_frame_stream();
 can_frame frame;
 
-extern MCP2515 mcp2515;  // defined in can_bus_comms.cpp
+extern MCP2515 mcp2515;  // defined in comms.cpp
 
 // notification flag for ISR and loop()
 volatile bool can_interrupt = false;
@@ -274,6 +274,51 @@ uint8_t extract_num(char input[], uint8_t &idx) {
 	return num;
 }
 
+void can_bus_cmd_get(char msg[]){
+	char next_cmd = msg[2];
+	uint8_t id = msg[4];
+
+	switch (next_cmd) {
+	case CMD_ILLUM:
+		comms::can_bus_send_response(id, CMD_ILLUM, utils->id_vec[0], 123.456);//utils->calc_lux());
+		break;
+
+	case CMD_DUTY_CYCLE:
+		
+		break;
+	
+	case CMD_OCCUPANCY:
+		
+		break;
+
+	case CMD_OCCUPIED_ILLUM:
+		break;
+	case CMD_UNOCCUPIED_ILLUM:
+		break;
+	case CMD_ILLUM_LB:
+		break;
+	case CMD_EXT_ILLUM:
+		break;
+	case CMD_CONTROL_REF:
+		break;
+	case CMD_ENERGY_COST:
+		break;
+	case CMD_POWER_CONSUPTION:
+		break;
+	case CMD_TIME:
+		break;
+	case CMD_ACCUM_ENERGY:
+		break;
+	case CMD_VISIBILITY_ERR:
+		break;
+	case CMD_FLICKER_ERR:
+		break;
+	default:
+		Serial.println("Invalid command!");
+		break;
+	}
+}
+
 void process_can_bus_cmd (can_frame frame){
     char msg[CAN_MAX_DLC + 1];
     
@@ -293,58 +338,17 @@ void process_can_bus_cmd (can_frame frame){
 	uint8_t id;
 	float_byte l;
 
-	if(utils->hub){ // if node is hub
-		id = msg[2];
-		idx = 4;
-		switch (cmd) {
-		case CMD_ILLUM:
-			for(unsigned long i = 0; i < sizeof(float); i++)
-				l.bytes[i] = msg[i+idx];
-			comms::serial_respond(CMD_ILLUM, id, l.val);
-			break;
-		
-		case CMD_DUTY_CYCLE:
-			comms::serial_respond(CMD_DUTY_CYCLE, id, msg[4]); //duty cycle in %
-			break;
-
-		case CMD_OCCUPANCY:
-			comms::serial_respond(CMD_OCCUPANCY, id, msg[4]); //occupancy
-			break;
-
-		case CMD_OCCUPIED_ILLUM:
-			for(unsigned long i = 0; i < sizeof(float); i++)
-				l.bytes[i] = msg[i+idx];
-			comms::serial_respond(CMD_OCCUPIED_ILLUM, id, l.val); // illuminance at ocuppied state
-			break;
-
-		case CMD_UNOCCUPIED_ILLUM:
-			for(unsigned long i = 0; i < sizeof(float); i++)
-				l.bytes[i] = msg[i+idx];
-			comms::serial_respond(CMD_UNOCCUPIED_ILLUM, id, l.val); // illuminance at ocuppied state
-			break;
-		// missing cases here
-
-		default:
-			break;
-		}
-	}
-    
-	switch (cmd) {
-	case CMD_GET:
-        next_cmd = msg[2];
-        id = msg[4];
-		switch (next_cmd) {
-		case CMD_ILLUM:
-			comms::can_bus_send_response(id, CMD_ILLUM, utils->id_vec[0], 123.456);//utils->calc_lux());
-			break;
-		
-		default:
-			break;
-		}
-		break;
-	default:
-		break;
-	}
+	if(utils->hub) // if node is hub
+		comms::forward_can_to_serial(msg);
+    else{
+        switch (cmd) {
+        case CMD_GET:
+            
+            break;
+        default:
+            break;
+        }
+    }
 }
 
 

@@ -4,6 +4,45 @@ MCP2515 mcp2515(10); //SS pin 10
 extern can_frame_stream *cf_stream; // defined in main.cpp
 extern can_frame frame; // defined in main.cpp
 
+void comms::forward_can_to_serial(char msg[]){
+	float_byte l;
+    char cmd = msg[0];
+    uint8_t id = msg[2];
+    uint8_t idx = 4;
+    
+    switch (cmd) {
+    case CMD_ILLUM:
+        for(unsigned long i = 0; i < sizeof(float); i++)
+            l.bytes[i] = msg[i+idx];
+        comms::serial_respond(CMD_ILLUM, id, l.val);
+        break;
+    
+    case CMD_DUTY_CYCLE:
+        comms::serial_respond(CMD_DUTY_CYCLE, id, msg[4]); //duty cycle in %
+        break;
+
+    case CMD_OCCUPANCY:
+        comms::serial_respond(CMD_OCCUPANCY, id, msg[4]); //occupancy
+        break;
+
+    case CMD_OCCUPIED_ILLUM:
+        for(unsigned long i = 0; i < sizeof(float); i++)
+            l.bytes[i] = msg[i+idx];
+        comms::serial_respond(CMD_OCCUPIED_ILLUM, id, l.val); // illuminance at ocuppied state
+        break;
+
+    case CMD_UNOCCUPIED_ILLUM:
+        for(unsigned long i = 0; i < sizeof(float); i++)
+            l.bytes[i] = msg[i+idx];
+        comms::serial_respond(CMD_UNOCCUPIED_ILLUM, id, l.val); // illuminance at ocuppied state
+        break;
+    // missing cases here
+
+    default:
+        break;
+    }
+}
+
 void comms::can_bus_send_response(uint8_t id, char cmd1, uint8_t own_id, float val){
 	char can_msg[CAN_MAX_DLEN];
 	float_byte f;

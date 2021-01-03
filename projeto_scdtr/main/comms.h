@@ -26,6 +26,7 @@ typedef union{
 } float_byte;
 
 namespace comms {
+    void forward_can_to_serial(char msg[]);
     void can_bus_send_response(uint8_t id, char cmd1, uint8_t own_id, float val);
     void can_bus_send_cmd(uint8_t id, char cmd1, char cmd2, uint8_t own_id);
     bool send_msg (uint8_t id, uint8_t my_id, uint8_t code);
