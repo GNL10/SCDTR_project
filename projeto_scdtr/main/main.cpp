@@ -260,11 +260,25 @@ ISR(TIMER1_COMPA_vect) {
     flag = 1;  // notify main loop
 }
 
-uint8_t extract_num(char input[], uint8_t &idx) {
+uint8_t extract_uint8_t (char input[], uint8_t &idx) {
 	char l = input[idx];
 	uint8_t num = 0; 
 
 	while (l != '\0' && l != ' ' && l != '\r'){
+		num *= 10;
+		num += (l - '0'); // add one digit at a time
+		l = input[++idx];
+	}
+	idx++; //leaves idx at beginning of next num
+	return num;
+}
+
+float extract_float (char input[], uint8_t &idx){
+    char l = input[idx];
+	float num = 0; 
+    float dec = 0.1;
+
+    while (l != '\0' && l != ' ' && l != '\r'){
 		num *= 10;
 		num += (l - '0'); // add one digit at a time
 		l = input[++idx];
@@ -355,7 +369,7 @@ void process_can_bus_cmd (can_frame frame){
 void cmd_get(char serial_input[]) {		//          012345
 	char next_cmd = serial_input[2]; 	// example:<g l 12>
 	uint8_t idx = 4;
-	uint8_t id = extract_num(serial_input, idx);
+	uint8_t id = extract_uint8_t(serial_input, idx);
 
 	switch (next_cmd) {
 	case CMD_ILLUM: //Get current measured illuminance at desk <i>
@@ -421,7 +435,7 @@ void process_serial_input_command(char serial_input[], uint8_t &idx) {
 		break;
 	
 	case CMD_OCCUPANCY: // set occupancy
-        id = extract_num(serial_input, aux_idx);
+        id = extract_uint8_t(serial_input, aux_idx);
         if(id == utils->my_id){
             occupancy = (serial_input[aux_idx] == '0') ? false : true;
             Serial.println("ACK");
