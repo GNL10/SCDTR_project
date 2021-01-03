@@ -6,6 +6,7 @@
 #include "controller.h"
 #include "simulator.h"
 #include "utils.h"
+#include "consensus.h"
 
 // can bus comms
 can_frame_stream *cf_stream = new can_frame_stream();
@@ -34,6 +35,7 @@ volatile float unoccupied_lux = 20;
 Utils *utils;
 Simulator *sim;
 Controller *ctrl;
+Consensus *consensus;
 
 volatile bool flag = true;
 unsigned long last_state_change{0};
@@ -187,7 +189,11 @@ void loop() {
 }
 
 bool negotiate() {
+    float d[utils->id_ctr];
+
     if (utils->my_id == utils->lowest_id && step == 0) {
+        consensus->iterate(d);
+
         comms::send_control_msg(utils->id_vec[1], utils->my_id, 'u', 0.5);
         step = 1;
     }
@@ -260,7 +266,7 @@ ISR(TIMER1_COMPA_vect) {
     flag = 1;  // notify main loop
 }
 
-uint8_t extract_uint8_t (char input[], uint8_t &idx) {
+uint8_t extract_uint8_t(char input[], uint8_t &idx) {
 	char l = input[idx];
 	uint8_t num = 0; 
 
@@ -273,14 +279,29 @@ uint8_t extract_uint8_t (char input[], uint8_t &idx) {
 	return num;
 }
 
-float extract_float (char input[], uint8_t &idx){
+float extract_float(char input[], uint8_t &idx){
     char l = input[idx];
-	float num = 0; 
+    float num = 0;
+    bool point = false;
     float dec = 0.1;
-
+    
     while (l != '\0' && l != ' ' && l != '\r'){
-		num *= 10;
-		num += (l - '0'); // add one digit at a time
+		if(l == '.'){
+            Serial.println("FOUND POINT");
+            point = true;
+            continue;
+        }
+        if(point == true) {
+            Serial.println("FOUND POINT");
+            num += dec*(l - '0');
+            dec *= 0.1; //decrease the decimal by another x10
+        } 
+        else{
+            num *= 10;
+		    num += (l - '0'); // add one digit at a time
+        }
+        Serial.print("NUMBER : "); Serial.println(num);
+
 		l = input[++idx];
 	}
 	idx++; //leaves idx at beginning of next num
@@ -428,6 +449,7 @@ void cmd_get(char serial_input[]) {		//          012345
 void process_serial_input_command(char serial_input[], uint8_t &idx) {
 	char command = serial_input[0]; // first part of command
 	uint8_t id, aux_idx = 2;
+    float val;
 
 	switch (command) {
 	case CMD_GET: // get parameter
@@ -446,7 +468,8 @@ void process_serial_input_command(char serial_input[], uint8_t &idx) {
 		break;
 	
 	case CMD_OCCUPIED_ILLUM: // Set lower bound on illuminance for Occupied state at desk <i>
-	
+        val = extract_float(serial_input, aux_idx);
+        Serial.print("FLOAT VALUE : "); Serial.println(val);
 		break;
 	
 	case CMD_UNOCCUPIED_ILLUM: // Set lower bound on illuminance for Unccupied state at desk <i>

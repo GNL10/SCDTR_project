@@ -25,3 +25,10 @@ void op::mul (float *a, float *b, int a_rows, int a_cols, int b_cols, float *res
 void op::copy (float *a, float *b, int rows, int cols) {
     memcpy(a, b, sizeof(a[0]) * rows * cols);
 }
+
+void op::scalar_mul (float a, float *b, int b_rows, int b_cols, float *res) {
+    for (int i = 0; i < b_rows; i++) {
+        for(int k = 0; k < b_cols; k++)
+            res[i*b_cols+k] = b[i*b_cols+k] * a;
+    }
+}
