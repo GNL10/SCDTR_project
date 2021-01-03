@@ -1,5 +1,4 @@
 #include "consensus.h"
-#include "node.h"
 #include "op.h"
 #include <math.h>
 

@@ -41,11 +41,10 @@ int Utils::find_id(uint8_t id) {
  */
 void Utils::load_EEPROM_vars() {
   int address = 0;
-  uint8_t id_tmp = 0;
 
-  EEPROM.get(address, id_tmp);
-  add_id(id_tmp);
-  address += sizeof(id_tmp);
+  EEPROM.get(address, this->my_id);
+  add_id(this->my_id);
+  address += sizeof(this->my_id);
   EEPROM.get(address, C1);
   address += sizeof(C1);
   EEPROM.get(address, m);
@@ -53,7 +52,7 @@ void Utils::load_EEPROM_vars() {
   EEPROM.get(address, b);
   address += sizeof(b);
   Serial.print("Inside id_tmp, C1, m, b: ");
-  Serial.print(id_tmp);
+  Serial.print(this->my_id);
   Serial.print(", ");
   Serial.print(C1, 6);
   Serial.print(", ");
@@ -143,6 +142,23 @@ void Utils::calc_residual_lux () {
   Serial.println(o); 
 }
 
+void Utils::order_ids(){
+    uint8_t i, j, temp;
+
+    for (i = 0; i < (this->id_ctr - 1); ++i)
+    {
+        for (j = 0; j < this->id_ctr - 1 - i; ++j )
+        {
+            if (this->id_vec[j] > this->id_vec[j+1])
+            {
+                temp = this->id_vec[j+1];
+                this->id_vec[j+1] = this->id_vec[j];
+                this->id_vec[j] = temp;
+            }
+        }
+    }
+}
+
 uint8_t Utils::analyse_id_broadcast (uint8_t cmd, uint8_t id){
 	Serial.print("\t\tReceiving : cmd : "); Serial.print(cmd);
 	Serial.print(" ID : "); Serial.println(id);
@@ -164,10 +180,10 @@ uint8_t Utils::analyse_id_broadcast (uint8_t cmd, uint8_t id){
 }
 
 bool Utils::sync (bool has_data, can_frame &frame, bool sync_recvd) {
-  if(lowest_id == id_vec[0]){ //if this is lowest id
+  if(lowest_id == my_id){ //if this is lowest id
     if(!sync_sent){
       sync_sent = true;
-      if(!comms::broadcast(id_vec[0], CAN_SYNC)) // send its own id
+      if(!comms::broadcast(my_id, CAN_SYNC)) // send its own id
         Serial.println(TX_BUF_FULL_ERR);
     }                                            
     else {
@@ -181,7 +197,7 @@ bool Utils::sync (bool has_data, can_frame &frame, bool sync_recvd) {
   }
   else{ // normal node, waits for CAN_SYNC msg
     if(sync_recvd){
-      if(!comms::send_msg(frame.data[1], id_vec[0], CAN_ACK))
+      if(!comms::send_msg(frame.data[1], my_id, CAN_ACK))
         Serial.println(TX_BUF_FULL_ERR);
         return true;
     }
@@ -191,18 +207,18 @@ bool Utils::sync (bool has_data, can_frame &frame, bool sync_recvd) {
 
 
 bool Utils::calibrate (bool has_data, can_frame &frame) {
-  if(id_vec[0] == lowest_id) {
+  if(my_id == lowest_id) {
     calc_residual_lux();
 
-    if(!comms::broadcast(id_vec[0], 'r')) //broadcast "Measure Residual Lux"+my_id
+    if(!comms::broadcast(my_id, 'r')) //broadcast "Measure Residual Lux"+my_id
         Serial.println(TX_BUF_FULL_ERR);
 
     analogWrite(LED_PIN, 255); //Light on
     delay(LED_WAIT_TIME);
 
-    calc_gain(id_vec[0]);
+    calc_gain(my_id);
 
-    if(!comms::broadcast(id_vec[0], 'm')) //broadcast "Measure"+my_id
+    if(!comms::broadcast(my_id, 'm')) //broadcast "Measure"+my_id
         Serial.println(TX_BUF_FULL_ERR);
     delay(MEASURE_WAIT_TIME);
     Serial.println("Light off");
@@ -210,7 +226,7 @@ bool Utils::calibrate (bool has_data, can_frame &frame) {
 
     for(int i = 1; i< id_ctr; i++)
     {     
-      if(!comms::send_msg(id_vec[i], id_vec[0], 'l')) //send "Light on"
+      if(!comms::send_msg(id_vec[i], my_id, 'l')) //send "Light on"
         Serial.println(TX_BUF_FULL_ERR);
       delay(LED_WAIT_TIME);
 
@@ -220,12 +236,12 @@ bool Utils::calibrate (bool has_data, can_frame &frame) {
         Serial.println(TX_BUF_FULL_ERR);
     
       delay(MEASURE_WAIT_TIME);
-      if(!comms::send_msg(id_vec[i], id_vec[0], 'o')) //send "Light off"
+      if(!comms::send_msg(id_vec[i], my_id, 'o')) //send "Light off"
         Serial.println(TX_BUF_FULL_ERR);
     }
 
     Serial.println("Broadcast calibration complete");
-    if(!comms::broadcast(id_vec[0], 'c')) //broadcast "Calibration Complete"
+    if(!comms::broadcast(my_id, 'c')) //broadcast "Calibration Complete"
         Serial.println(TX_BUF_FULL_ERR);
 
     for (int i=0; i < id_ctr; i++) {

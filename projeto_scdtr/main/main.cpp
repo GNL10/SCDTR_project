@@ -31,8 +31,6 @@ volatile bool occupancy = false;
 volatile float occupied_lux = 50;
 volatile float unoccupied_lux = 20;
 
-uint8_t my_id;
-
 Utils *utils;
 Simulator *sim;
 Controller *ctrl;
@@ -73,10 +71,9 @@ void setup() {
     Serial.begin(115200);
     utils = new Utils();
     Serial.print("Node with ID : ");
-    Serial.println(utils->id_vec[0]);
+    Serial.println(utils->my_id);
 
     utils->isHub();
-    my_id = utils->id_vec[0];
 
     // set timer 2 divisor to     1 for PWM frequency of 31372.55 Hz
     TCCR2B = (TCCR2B & B11111000) | B00000001;
@@ -101,8 +98,8 @@ void loop() {
 
         case State::send_id_broadcast:
             Serial.print("Sending broadcast with ID : ");
-            Serial.println(utils->id_vec[0]);
-            if (!comms::broadcast(my_id, CAN_NEW_ID))  // send its own id
+            Serial.println(utils->my_id);
+            if (!comms::broadcast(utils->my_id, CAN_NEW_ID))  // send its own id
                 Serial.println(TX_BUF_FULL_ERR);
 
             last_state_change = micros();
@@ -113,6 +110,7 @@ void loop() {
 
         case State::wait_for_ids:
             if (wait_event || sync_recvd) {
+                utils->order_ids();
                 curr_state = State::sync;
             } else {
                 if (has_data) {
@@ -120,9 +118,10 @@ void loop() {
                                                               frame.data[1]);
                     if (res == 3)  // received msg was not of type CAN_NEW_ID
                         break;
-                    else if (res == 2)  // max number of nodes has been reached
-                        curr_state = State::sync;  // stop the search and move
-                                                   // on to calibration
+                    else if (res == 2){  // max number of nodes has been reached
+                        utils->order_ids();
+                        curr_state = State::sync;  // stop the search and move on to calibration
+                    }
                     else if (res == 1)  // if the id was correctly added
                         curr_state = State::send_id_broadcast;  // resend own id
 
@@ -188,8 +187,8 @@ void loop() {
 }
 
 bool negotiate() {
-    if (my_id == utils->lowest_id && step == 0) {
-        comms::send_control_msg(utils->id_vec[1], my_id, 'u', 0.5);
+    if (utils->my_id == utils->lowest_id && step == 0) {
+        comms::send_control_msg(utils->id_vec[1], utils->my_id, 'u', 0.5);
         step = 1;
     }
     if (has_data) {
@@ -200,7 +199,7 @@ bool negotiate() {
             rcv_u.bytes[i - 2] = frame.data[i];
         Serial.print("float received: ");
         Serial.println(rcv_u.value);
-        comms::send_control_msg(utils->id_vec[1], my_id, 'u', 0.5);
+        comms::send_control_msg(utils->id_vec[1], utils->my_id, 'u', 0.5);
         return true;
     }
 
@@ -212,7 +211,7 @@ void read_events() {
 		if (utils->serial_read_lux()) {  // command is ready to be processed
 			process_serial_input_command(utils->serial_input, utils->serial_input_index);
 			x_ref = (occupancy == true) ? occupied_lux : unoccupied_lux;  // decides x_ref, depending if it is occupied or not
-			u_ff = (x_ref == 0) ? 0 : (x_ref - utils->o) / utils->k[utils->id_vec[0]];  // if x_ref = 0, u_ff = 0
+			u_ff = (x_ref == 0) ? 0 : (x_ref - utils->o) / utils->k[utils->my_id];  // if x_ref = 0, u_ff = 0
 			t_i = micros();
 			v_i = utils->get_voltage();
 		}
@@ -280,7 +279,7 @@ void can_bus_cmd_get(char msg[]){
 
 	switch (next_cmd) {
 	case CMD_ILLUM:
-		comms::can_bus_send_response(id, CMD_ILLUM, utils->id_vec[0], 123.456);//utils->calc_lux());
+		comms::can_bus_send_response(id, CMD_ILLUM, utils->my_id, 123.456);//utils->calc_lux());
 		break;
 
 	case CMD_DUTY_CYCLE:
@@ -360,24 +359,24 @@ void cmd_get(char serial_input[]) {		//          012345
 
 	switch (next_cmd) {
 	case CMD_ILLUM: //Get current measured illuminance at desk <i>
-		if(id == utils->id_vec[0]) // if this is the node being asked
+		if(id == utils->my_id) // if this is the node being asked
             comms::serial_respond(CMD_ILLUM, id, utils->calc_lux());
 		else // send the msg to the node
-			comms::can_bus_send_cmd(id, CMD_GET, CMD_ILLUM, utils->id_vec[0]);
+			comms::can_bus_send_cmd(id, CMD_GET, CMD_ILLUM, utils->my_id);
 		break;
 
 	case CMD_DUTY_CYCLE:
-		if(id == utils->id_vec[0]) // if this is the node being asked
-			comms::serial_respond(CMD_DUTY_CYCLE, utils->id_vec[0], u_sat);
+		if(id == utils->my_id) // if this is the node being asked
+			comms::serial_respond(CMD_DUTY_CYCLE, utils->my_id, u_sat);
 		else
-			comms::can_bus_send_cmd(id, CMD_GET, CMD_DUTY_CYCLE, utils->id_vec[0]);
+			comms::can_bus_send_cmd(id, CMD_GET, CMD_DUTY_CYCLE, utils->my_id);
 		break;
 	
 	case CMD_OCCUPANCY:
-		if(id == utils->id_vec[0]) // if this is the node being asked
+		if(id == utils->my_id) // if this is the node being asked
 			comms::serial_respond(CMD_OCCUPANCY, id, (int)occupancy);
 		else
-			comms::can_bus_send_cmd(id, CMD_GET, CMD_OCCUPANCY, utils->id_vec[0]);
+			comms::can_bus_send_cmd(id, CMD_GET, CMD_OCCUPANCY, utils->my_id);
 		break;
 
 	case CMD_OCCUPIED_ILLUM:
@@ -423,12 +422,12 @@ void process_serial_input_command(char serial_input[], uint8_t &idx) {
 	
 	case CMD_OCCUPANCY: // set occupancy
         id = extract_num(serial_input, aux_idx);
-        if(id == utils->id_vec[0]){
+        if(id == utils->my_id){
             occupancy = (serial_input[aux_idx] == '0') ? false : true;
             Serial.println("ACK");
         }
         else 
-            comms::can_bus_send_cmd(id, CMD_OCCUPANCY, utils->id_vec[0], (serial_input[aux_idx] == '0') ? 0 : 1);
+            comms::can_bus_send_cmd(id, CMD_OCCUPANCY, utils->my_id, (serial_input[aux_idx] == '0') ? 0 : 1);
          
 		break;
 	
@@ -484,7 +483,7 @@ void can_bus_setup() {
     mcp2515.setBitrate(CAN_1000KBPS, MCP_16MHZ);
 
     mcp2515.setFilterMask(MCP2515::MASK0, 0, CAN_SFF_MASK);
-    mcp2515.setFilter(MCP2515::RXF0, 0, (uint32_t)utils->id_vec[0]);  // own id
+    mcp2515.setFilter(MCP2515::RXF0, 0, (uint32_t)utils->my_id);  // own id
 
     mcp2515.setFilterMask(MCP2515::MASK1, 0, CAN_SFF_MASK);
     mcp2515.setFilter(MCP2515::RXF2, 0, CAN_BROADCAST_ID);  // own id

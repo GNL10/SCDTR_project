@@ -15,6 +15,7 @@ private:
 public:
   uint8_t id_ctr; // number of ids in id_vec (including its own id)
   uint8_t id_vec[ID_MAX_NUM]; // id[0] is node's own id
+  uint8_t my_id;
   uint8_t lowest_id;
   float k[];
   float o;
@@ -37,6 +38,7 @@ public:
   void calc_gain (uint8_t sender_id);
   void serial_respond(char cmd, uint8_t id, float val);
   void serial_respond(char cmd, uint8_t id, int val);
+  void order_ids();
 
   uint8_t analyse_id_broadcast (uint8_t cmd, uint8_t id);
 
