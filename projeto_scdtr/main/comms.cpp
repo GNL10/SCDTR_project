@@ -81,8 +81,8 @@ bool comms::send_msg (uint8_t id, uint8_t my_id, uint8_t code) {
 }
 
 bool comms::send_control_msg(uint8_t id, uint8_t my_id, uint8_t code, float u){
-    my_can_msg m;
-    m.value = u;
+    float_byte m;
+    m.val = u;
     uint8_t msg[6];
     msg[0] = code;
     msg[1] = my_id;
@@ -144,15 +144,41 @@ void comms::serial_respond(char cmd, uint8_t id, int val){
 	Serial.println(val);
 }
 
-/*MCP2515::ERROR write(uint32_t id, uint32_t val, uint8_t n_bytes) {
-    can_frame frame;
-    frame.can_id = id;
-    frame.can_dlc = n_bytes;
-    my_can_msg msg;
-    msg.value = val; //pack data
-    for( int i = 0; i < n_bytes; i++ ) //prepare can message
-        frame.data[i] = msg.bytes[i];
+uint8_t comms::extract_uint8_t(char input[], uint8_t &idx) {
+	char l = input[idx];
+	uint8_t num = 0; 
+
+	while (l != '\0' && l != ' ' && l != '\r'){
+		num *= 10;
+		num += (l - '0'); // add one digit at a time
+		l = input[++idx];
+	}
+	idx++; //leaves idx at beginning of next num
+	return num;
+}
+
+float comms::extract_float(char input[], uint8_t &idx){
+    char l = input[idx];
+    float num = 0;
+    bool point = false;
+    float dec = 0.1;
     
-    //send data
-    return mcp2515.sendMessage(&frame);
-}*/
+    while (l != '\0' && l != ' ' && l != '\r'){
+		if(l == '.'){
+            point = true;
+            l = input[++idx];
+            continue;
+        }
+        if(point == true) {
+            num += dec*(l - '0');
+            dec *= 0.1; //decrease the decimal by another x10
+        } 
+        else{
+            num *= 10;
+		    num += (l - '0'); // add one digit at a time
+        }
+		l = input[++idx];
+	}
+	idx++; //leaves idx at beginning of next num
+	return num;
+}

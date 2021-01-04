@@ -163,7 +163,7 @@ uint8_t Utils::analyse_id_broadcast (uint8_t cmd, uint8_t id){
 	Serial.print("\t\tReceiving : cmd : "); Serial.print(cmd);
 	Serial.print(" ID : "); Serial.println(id);
 
-	if(cmd != CAN_NEW_ID){
+	if(cmd != CMD_NEW_ID){
 		Serial.println("ERROR: Wrong msg in wait_for_ids.");
 		return 3;
 	}
@@ -183,11 +183,11 @@ bool Utils::sync (bool has_data, can_frame &frame, bool sync_recvd) {
   if(lowest_id == my_id){ //if this is lowest id
     if(!sync_sent){
       sync_sent = true;
-      if(!comms::broadcast(my_id, CAN_SYNC)) // send its own id
+      if(!comms::broadcast(my_id, CMD_SYNC)) // send its own id
         Serial.println(TX_BUF_FULL_ERR);
     }                                            
     else {
-      if(has_data && frame.data[0] == CAN_ACK){ // waits until it receives all the acknowledges
+      if(has_data && frame.data[0] == CMD_ACK){ // waits until it receives all the acknowledges
         if((++ack_ctr) == id_ctr - 1){
           ack_ctr = 0;
           return true;
@@ -197,9 +197,9 @@ bool Utils::sync (bool has_data, can_frame &frame, bool sync_recvd) {
   }
   else{ // normal node, waits for CAN_SYNC msg
     if(sync_recvd){
-      if(!comms::send_msg(frame.data[1], my_id, CAN_ACK))
+      if(!comms::send_msg(frame.data[1], my_id, CMD_ACK))
         Serial.println(TX_BUF_FULL_ERR);
-        return true;
+      return true;
     }
   }
   return false;

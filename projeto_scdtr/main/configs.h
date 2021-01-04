@@ -18,7 +18,7 @@ const float K2 = 0.5;//0.5;//0.1;  // Integrator gain
 const float error_margin = 0.5;//0.20;    // Margin of error to be ignored
 
 
-/* SERIAL COMMANDS */
+/* COMMANDS */
 #define SPACE ' '
 #define CMD_GET 'g'
 #define CMD_ILLUM 'l'
@@ -37,7 +37,12 @@ const float error_margin = 0.5;//0.20;    // Margin of error to be ignored
 #define CMD_VISIBILITY_ERR 'v'
 #define CMD_FLICKER_ERR 'f'
 #define CMD_RESET 'r'
-#define CMD_ACK 'A'
+#define CMD_ACK 'k'
+#define CMD_SYNC 's' 
+#define CMD_NEW_ID (uint8_t) 'n' // message sent that indicates the addition of a new node
+
+#define SERIAL_ACK "ack"
+#define SERIAL_ERR "err"
 
 
 #endif
