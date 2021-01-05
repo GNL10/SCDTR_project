@@ -40,7 +40,7 @@ public:
   void serial_respond(char cmd, uint8_t id, int val);
   void order_ids();
 
-  uint8_t analyse_id_broadcast (uint8_t cmd, uint8_t id);
+  uint8_t analyse_id_broadcast (uint32_t id);
 
   void calc_residual_lux ();
   bool serial_read_lux();

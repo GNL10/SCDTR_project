@@ -8,6 +8,7 @@
 #include "utils.h"
 #include "consensus.h"
 
+
 // can bus comms
 can_frame_stream *cf_stream = new can_frame_stream();
 can_frame frame;
@@ -40,7 +41,7 @@ Consensus *consensus;
 volatile bool flag = true;
 unsigned long last_state_change{0};
 volatile bool wait_event;
-volatile unsigned long timeout{5000000};
+volatile unsigned long timeout{4000000};
 
 volatile bool has_data;
 
@@ -102,7 +103,7 @@ void loop() {
         case State::send_id_broadcast:
             Serial.print("Sending broadcast with ID : ");
             Serial.println(utils->my_id);
-            if (!comms::broadcast(utils->my_id, CMD_NEW_ID))  // send its own id
+            if (!comms::broadcast(utils->my_id, CAN_NEW_ID))  // send its own id
                 Serial.println(TX_BUF_FULL_ERR);
 
             last_state_change = micros();
@@ -117,8 +118,7 @@ void loop() {
                 curr_state = State::sync;
             } else {
                 if (has_data) {
-                    uint8_t res = utils->analyse_id_broadcast(frame.data[0],
-                                                              frame.data[1]);
+                    uint8_t res = utils->analyse_id_broadcast(frame.can_id);
                     if (res == 3)  // received msg was not of type CAN_NEW_ID
                         break;
                     else if (res == 2){  // max number of nodes has been reached
@@ -135,7 +135,7 @@ void loop() {
             break;
 
         case State::sync:
-            if (utils->sync(sync_recvd, ack_recvd, frame.data[1])) {
+            if (utils->sync(sync_recvd, ack_recvd, comms::get_src_id(frame.can_id))) {
                 Serial.println("\n\n######## SYNCHRONIZED ########\n\n");
                 curr_state = State::calibrate;
             }
@@ -201,7 +201,6 @@ bool negotiate() {
         step = 1;
     }
     if (has_data) {
-        comms::print_msg();
         Serial.println("Calculating u");
         float_byte rcv_u;
         for (int i = 2; i < 6; i++)  // prepare can message
@@ -218,7 +217,7 @@ bool negotiate() {
 void read_events() {
     if(utils->hub) {
 		if (utils->serial_read_lux()) {  // command is ready to be processed
-			process_serial_input_command(utils->serial_input, utils->serial_input_index);
+			//process_serial_input_command(utils->serial_input, utils->serial_input_index);
 			x_ref = (occupancy == true) ? occupied_lux : unoccupied_lux;  // decides x_ref, depending if it is occupied or not
 			u_ff = (x_ref == 0) ? 0 : (x_ref - utils->o) / utils->k[utils->my_id];  // if x_ref = 0, u_ff = 0
 			t_i = micros();
@@ -226,8 +225,19 @@ void read_events() {
 		}
 	}
 
-    if (micros() - last_state_change > timeout) wait_event = true; // timeout
+    if (micros() - last_state_change > timeout) 
+        wait_event = true; // timeout
     cli(); has_data = cf_stream->get(frame); sei();
+
+    if( mcp2515_overflow ) {
+        Serial.println( "\t\t\t\tMCP2516 RX Buf Overflow" );
+        mcp2515_overflow = false;
+    }
+
+    if( arduino_overflow ) {
+        Serial.println( "\t\t\t\tArduino Buffers Overflow" );
+        arduino_overflow = false;
+    }
 
 	if(has_data){
         process_can_bus_cmd(frame);
@@ -265,7 +275,7 @@ void irqHandler() {
 ISR(TIMER1_COMPA_vect) {
     flag = 1;  // notify main loop
 }
-
+/*
 void can_bus_cmd_get(char msg[]){
 	char next_cmd = msg[2];
 	uint8_t id = msg[4];
@@ -313,8 +323,29 @@ void can_bus_cmd_get(char msg[]){
 		break;
 	}
 }
-
+*/
 void process_can_bus_cmd (can_frame frame){
+    Serial.print("RECEIVED NEW MSG :  ID: ");
+    Serial.print(frame.can_id, BIN);
+    Serial.print("\t CMD :");
+    Serial.println(frame.can_id & CMD_MASK);
+    
+    uint8_t cmd = comms::get_cmd(frame.can_id);
+
+    switch (cmd){
+    case CAN_NEW_ID:
+        break;
+    case CAN_SYNC:
+        sync_recvd = true;
+        break;
+    case CAN_ACK:
+        ack_recvd = true;
+        break;
+    
+    default:
+        break;
+    }
+    /*
     char msg[CAN_MAX_DLC + 1];
 
     Serial.print("CAN BUS RECEIVING : (byte*) ");
@@ -333,7 +364,7 @@ void process_can_bus_cmd (can_frame frame){
 
 	if(utils->hub) // if node is hub
 		comms::forward_can_to_serial(msg);
-        
+
     switch (cmd) {
     case CMD_GET:
         can_bus_cmd_get(msg);
@@ -352,12 +383,12 @@ void process_can_bus_cmd (can_frame frame){
         break;
     default:
         break;
-    }
+    }*/
     
 }
 
 
-
+/*
 void cmd_get(char serial_input[]) {		//          012345
 	char next_cmd = serial_input[2]; 	// example:<g l 12>
 	uint8_t idx = 4;
@@ -420,11 +451,13 @@ void cmd_get(char serial_input[]) {		//          012345
 		break;
 	}
 }
+*/
 
 /**
  * Processes the command entered in the serial_input variable
  * Changes occupancy and lower bound values according to command
  */
+/*
 void process_serial_input_command(char serial_input[], uint8_t &idx) {
 	char command = serial_input[0]; // first part of command
 	uint8_t id, aux_idx = 2;
@@ -469,7 +502,7 @@ void process_serial_input_command(char serial_input[], uint8_t &idx) {
 		break;
 	}	
 	idx = 0;
-}
+}*/
 
 void control_interrupt_setup() {
     cli();       // disable interrupts
@@ -499,11 +532,12 @@ void can_bus_setup() {
     mcp2515.reset();
     mcp2515.setBitrate(CAN_1000KBPS, MCP_16MHZ);
 
-    mcp2515.setFilterMask(MCP2515::MASK0, 0, CAN_SFF_MASK);
-    mcp2515.setFilter(MCP2515::RXF0, 0, (uint32_t)utils->my_id);  // own id
+    mcp2515.setFilterMask(MCP2515::MASK0, 0,  CAN_BROADCAST_ID << TO_SHIFT);
+    mcp2515.setFilter(MCP2515::RXF0, 0, utils->my_id << TO_SHIFT);  // own id
+    Serial.println();
 
-    mcp2515.setFilterMask(MCP2515::MASK1, 0, CAN_SFF_MASK);
-    mcp2515.setFilter(MCP2515::RXF2, 0, CAN_BROADCAST_ID);  // own id
+    mcp2515.setFilterMask(MCP2515::MASK1, 0, CAN_BROADCAST_ID << TO_SHIFT);
+    mcp2515.setFilter(MCP2515::RXF2, 0, CAN_BROADCAST_ID << TO_SHIFT);  // broadcast id
     // TODO if isHub, set mask to accept everything
 
     mcp2515.setNormalMode();

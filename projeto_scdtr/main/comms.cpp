@@ -43,6 +43,7 @@ void comms::forward_can_to_serial(char msg[]){
     }
 }
 
+/*
 void comms::can_bus_send_response(uint8_t id, char cmd1, uint8_t own_id, float val){
 	char can_msg[CAN_MAX_DLEN];
 	float_byte f;
@@ -73,12 +74,6 @@ void comms::can_bus_send_cmd(uint8_t id, char cmd1, char cmd2, uint8_t own_id){
         Serial.println(TX_BUF_FULL_ERR);
 }
 
-bool comms::send_msg (uint8_t id, uint8_t my_id, uint8_t code) {
-    uint8_t msg[] {code, my_id};
-    if(write(id, msg, sizeof(msg)) != MCP2515::ERROR_OK )
-        return false;
-    return true;
-}
 
 bool comms::send_control_msg(uint8_t id, uint8_t my_id, uint8_t code, float u){
     float_byte m;
@@ -92,11 +87,16 @@ bool comms::send_control_msg(uint8_t id, uint8_t my_id, uint8_t code, float u){
         return false;
     return true;
 }
+*/
 
-bool comms::broadcast (uint8_t id, uint8_t code) { //make it general
-    uint8_t msg[] {code, id};
+bool comms::send_msg (uint8_t to_id, uint8_t my_id, uint8_t cmd) {
+    if(write(to_id, my_id, cmd) != MCP2515::ERROR_OK )
+        return false;
+    return true;
+}
 
-    if(write(CAN_BROADCAST_ID, msg, sizeof(msg)) != MCP2515::ERROR_OK )
+bool comms::broadcast (uint8_t id, uint8_t cmd) { //make it general
+    if(write( CAN_BROADCAST_ID, id, cmd) != MCP2515::ERROR_OK )
         return false;
     return true;
 }
@@ -117,13 +117,38 @@ void comms::print_msg () {
     Serial.println();
 }
 
-MCP2515::ERROR comms::write(uint32_t id, uint8_t bytes[], uint8_t n_bytes) {
+MCP2515::ERROR comms::write(uint8_t to_id, uint8_t my_id, uint8_t code, uint8_t bytes[], uint8_t n_bytes) {
 	can_frame frame;
+    uint32_t id = 0;
+
+    id |= (to_id & ID_MASK) << TO_SHIFT;
+    id |= (my_id & ID_MASK) << FROM_SHIFT;
+    id |= code & CMD_MASK; 
+    Serial.print("SENDING MESSAGE WITH ID : ");
+    Serial.println(id, BIN);
+
 	frame.can_id = id;
 	frame.can_dlc = n_bytes;
 	for( int i = 0; i < n_bytes; i++ ) //prepare can message
 		frame.data[i] = bytes[i];
 	
+	//send data
+	return mcp2515.sendMessage(&frame);
+}
+
+// Send message with no data inside
+MCP2515::ERROR comms::write(uint8_t to_id, uint8_t my_id, uint8_t code) {
+	can_frame frame;
+    uint32_t id = 0;
+
+    id |= (to_id & ID_MASK) << TO_SHIFT;
+    id |= (my_id & ID_MASK) << FROM_SHIFT;
+    id |= code & CMD_MASK; 
+    Serial.print("SENDING MESSAGE WITH ID : ");
+    Serial.println(id, BIN);
+
+	frame.can_id = id;
+	frame.can_dlc = 0;
 	//send data
 	return mcp2515.sendMessage(&frame);
 }
@@ -142,6 +167,13 @@ void comms::serial_respond(char cmd, uint8_t id, int val){
 	Serial.print(id);	
 	Serial.print(SPACE);
 	Serial.println(val);
+}
+
+uint8_t comms::get_src_id(uint32_t id) {
+    return (id >> FROM_SHIFT) & ID_MASK;
+}
+uint8_t comms::get_cmd(uint32_t id) {
+    return id & CMD_MASK;
 }
 
 uint8_t comms::extract_uint8_t(char input[], uint8_t &idx) {

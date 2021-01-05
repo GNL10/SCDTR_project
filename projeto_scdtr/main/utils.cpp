@@ -159,31 +159,36 @@ void Utils::order_ids(){
     }
 }
 
-uint8_t Utils::analyse_id_broadcast (uint8_t cmd, uint8_t id){
-	Serial.print("\t\tReceiving : cmd : "); Serial.print(cmd);
-	Serial.print(" ID : "); Serial.println(id);
-
-	if(cmd != CMD_NEW_ID){
+uint8_t Utils::analyse_id_broadcast (uint32_t id){
+	//Serial.print("\t\tReceiving : cmd : "); Serial.print(cmd);
+	//Serial.print(" ID : "); Serial.println(id);
+    uint8_t code = id & CMD_MASK;
+    uint8_t from_id = comms::get_src_id(id);
+	if(code != CAN_NEW_ID){
 		Serial.println("ERROR: Wrong msg in wait_for_ids.");
 		return 3;
 	}
 
-	if(find_id(id) == -1){ // if id is not found, then it is a new node
-		if (!add_id(id)) { // if id number has been exceeded
+	if(find_id(from_id) == -1){ // if id is not found, then it is a new node
+		if (!add_id(from_id)) { // if id number has been exceeded
 			Serial.println("ERROR: ID number exceeded");
 			return 2;
 		}
-		else
+		else{
+            Serial.print("ADDED ID : "); Serial.println(from_id);
 			return 1;// if the id was correctly added
+        }
 	}
 	return 0;// if it is not new node, then ignore
 }
 
 bool Utils::sync (bool &sync_recvd, bool &ack_recvd, uint8_t sendto_id) {
   if(lowest_id == my_id){ //if this is lowest id
+    Serial.println("i should be sending a sync");
     if(!sync_sent){
       sync_sent = true;
-      if(!comms::broadcast(my_id, CMD_SYNC)) // send its own id
+      Serial.println("Sending a sync");
+      if(!comms::broadcast(my_id, CAN_SYNC)) // send its own id
         Serial.println(TX_BUF_FULL_ERR);
     }                                            
     else {
@@ -199,7 +204,7 @@ bool Utils::sync (bool &sync_recvd, bool &ack_recvd, uint8_t sendto_id) {
   else{ // normal node, waits for CAN_SYNC msg
     if(sync_recvd){
       sync_recvd = false; // reset
-      if(!comms::send_msg(sendto_id, my_id, CMD_ACK))
+      if(comms::write(sendto_id, my_id, CAN_ACK)!= MCP2515::ERROR_OK)
         Serial.println(TX_BUF_FULL_ERR);
       return true;
     }
@@ -212,7 +217,7 @@ bool Utils::calibrate (bool has_data, can_frame &frame) {
   if(my_id == lowest_id) {
     calc_residual_lux();
 
-    if(!comms::broadcast(my_id, 'r')) //broadcast "Measure Residual Lux"+my_id
+    if(!comms::broadcast(my_id, CAN_MEAS_RESIDUAL_LUX)) //broadcast "Measure Residual Lux"+my_id
         Serial.println(TX_BUF_FULL_ERR);
 
     analogWrite(LED_PIN, 255); //Light on
@@ -220,7 +225,7 @@ bool Utils::calibrate (bool has_data, can_frame &frame) {
 
     calc_gain(my_id);
 
-    if(!comms::broadcast(my_id, 'm')) //broadcast "Measure"+my_id
+    if(!comms::broadcast(my_id, CAN_MEAS_LUX)) //broadcast "Measure"+my_id
         Serial.println(TX_BUF_FULL_ERR);
     delay(MEASURE_WAIT_TIME);
     Serial.println("Light off");
@@ -228,22 +233,22 @@ bool Utils::calibrate (bool has_data, can_frame &frame) {
 
     for(int i = 1; i< id_ctr; i++)
     {     
-      if(!comms::send_msg(id_vec[i], my_id, 'l')) //send "Light on"
+      if(!comms::send_msg(id_vec[i], my_id, CAN_LIGHT_ON)) //send "Light on"
         Serial.println(TX_BUF_FULL_ERR);
       delay(LED_WAIT_TIME);
 
       calc_gain(id_vec[i]);
 
-      if(!comms::broadcast(id_vec[i], 'm')) //broadcast "Measure"+id
+      if(!comms::broadcast(id_vec[i], CAN_MEAS_LUX)) //broadcast "Measure"+id
         Serial.println(TX_BUF_FULL_ERR);
     
       delay(MEASURE_WAIT_TIME);
-      if(!comms::send_msg(id_vec[i], my_id, 'o')) //send "Light off"
+      if(!comms::send_msg(id_vec[i], my_id, CAN_LIGHT_OFF)) //send "Light off"
         Serial.println(TX_BUF_FULL_ERR);
     }
 
     Serial.println("Broadcast calibration complete");
-    if(!comms::broadcast(my_id, 'c')) //broadcast "Calibration Complete"
+    if(!comms::broadcast(my_id, CAN_CALIB_COMPLETE)) //broadcast "Calibration Complete"
         Serial.println(TX_BUF_FULL_ERR);
 
     for (int i=0; i < id_ctr; i++) {
@@ -259,30 +264,31 @@ bool Utils::calibrate (bool has_data, can_frame &frame) {
   else{
     if (has_data) 
     {
+      uint8_t cmd = comms::get_cmd(frame.can_id);
       comms::print_msg();
-      if(frame.data[0] == 114) //'r' in decimal
+      if(cmd == CAN_MEAS_RESIDUAL_LUX) //'r' in decimal
       {
         Serial.println("Calculating residual lux."); 
         calc_residual_lux();
       }
-      if(frame.data[0] == 108) //'l' in decimal
+      if(cmd == CAN_LIGHT_ON) //'l' in decimal
       {
         analogWrite(LED_PIN, 255); //Light on
         Serial.println("Light on.");
       }
 
-      if(frame.data[0] == 111) //'o' in decimal
+      if(cmd == CAN_LIGHT_OFF) //'o' in decimal
       {
         analogWrite(LED_PIN, 0); //Light off
         Serial.println("Light off.");
       }
-      if(frame.data[0] == 109) //'m' in decimal
+      if(cmd == CAN_MEAS_LUX) //'m' in decimal
       {
         Serial.println("Calculating gain.");
-        calc_gain(frame.data[1]);          
+        calc_gain(comms::get_src_id(frame.can_id));          
       }
 
-      if(frame.data[0] == 99) //'c' in decimal
+      if(cmd == CAN_CALIB_COMPLETE) //'c' in decimal
       {
         for (int i=0; i < id_ctr; i++) {
           Serial.print("k");
