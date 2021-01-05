@@ -44,7 +44,8 @@ volatile unsigned long timeout{5000000};
 
 volatile bool has_data;
 
-volatile bool sync_recvd = false;
+bool sync_recvd = false;
+bool ack_recvd = false;
 
 enum class State : byte {
     start,
@@ -134,7 +135,7 @@ void loop() {
             break;
 
         case State::sync:
-            if (utils->sync(has_data, frame, sync_recvd)) {
+            if (utils->sync(sync_recvd, ack_recvd, frame.data[1])) {
                 Serial.println("\n\n######## SYNCHRONIZED ########\n\n");
                 curr_state = State::calibrate;
             }
@@ -231,9 +232,6 @@ void read_events() {
 	if(has_data){
         process_can_bus_cmd(frame);
 	}
-    if (has_data && frame.data[0] == CMD_SYNC) {
-        sync_recvd = true;
-    }
 }
 
 void irqHandler() {
@@ -318,7 +316,7 @@ void can_bus_cmd_get(char msg[]){
 
 void process_can_bus_cmd (can_frame frame){
     char msg[CAN_MAX_DLC + 1];
-    
+
     Serial.print("CAN BUS RECEIVING : (byte*) ");
     for(int i = 0; i < frame.can_dlc; i++) {
         Serial.print(frame.data[i]);
@@ -335,19 +333,27 @@ void process_can_bus_cmd (can_frame frame){
 
 	if(utils->hub) // if node is hub
 		comms::forward_can_to_serial(msg);
-    else{
-        switch (cmd) {
-        case CMD_GET:
-            can_bus_cmd_get(msg);
-            break;
-        case CMD_OCCUPANCY:
-            id = msg[2];
-            //get float from can bus
-            break;
-        default:
-            break;
-        }
+        
+    switch (cmd) {
+    case CMD_GET:
+        can_bus_cmd_get(msg);
+        break;
+    case CMD_OCCUPANCY:
+        id = msg[2];
+        //get float from can bus
+        break;
+
+    case CMD_SYNC:
+        Serial.println("RECEIVED A SYNC");
+        sync_recvd = true;
+        break;
+    case CMD_ACK:
+        ack_recvd = true;
+        break;
+    default:
+        break;
     }
+    
 }
 
 

@@ -179,7 +179,7 @@ uint8_t Utils::analyse_id_broadcast (uint8_t cmd, uint8_t id){
 	return 0;// if it is not new node, then ignore
 }
 
-bool Utils::sync (bool has_data, can_frame &frame, bool sync_recvd) {
+bool Utils::sync (bool &sync_recvd, bool &ack_recvd, uint8_t sendto_id) {
   if(lowest_id == my_id){ //if this is lowest id
     if(!sync_sent){
       sync_sent = true;
@@ -187,7 +187,8 @@ bool Utils::sync (bool has_data, can_frame &frame, bool sync_recvd) {
         Serial.println(TX_BUF_FULL_ERR);
     }                                            
     else {
-      if(has_data && frame.data[0] == CMD_ACK){ // waits until it receives all the acknowledges
+      if(ack_recvd){ // waits until it receives all the acknowledges
+        ack_recvd = false;
         if((++ack_ctr) == id_ctr - 1){
           ack_ctr = 0;
           return true;
@@ -197,7 +198,8 @@ bool Utils::sync (bool has_data, can_frame &frame, bool sync_recvd) {
   }
   else{ // normal node, waits for CAN_SYNC msg
     if(sync_recvd){
-      if(!comms::send_msg(frame.data[1], my_id, CMD_ACK))
+      sync_recvd = false; // reset
+      if(!comms::send_msg(sendto_id, my_id, CMD_ACK))
         Serial.println(TX_BUF_FULL_ERR);
       return true;
     }

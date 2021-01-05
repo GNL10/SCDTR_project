@@ -4,7 +4,7 @@
 #include <Arduino.h>
 
 #define SERIAL_INPUT_SIZE 15
-#define ID_MAX_NUM 64 // uint8 max 255
+#define ID_MAX_NUM 3 // uint8 max 255
 
 
 const unsigned long sampInterval = 10000; //microseconds 100Hz

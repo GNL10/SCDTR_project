@@ -46,7 +46,7 @@ public:
   bool serial_read_lux();
   bool isHub();
 
-  bool sync (bool has_data, can_frame &frame, bool sync_recvd);
+  bool sync (bool &sync_recvd, bool &ack_recvd, uint8_t sendto_id);
   bool calibrate (bool has_data, can_frame &frame);
   
 };
