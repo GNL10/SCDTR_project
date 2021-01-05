@@ -13,7 +13,7 @@
 #define CAN_NEW_ID (uint8_t) 1 // message sent that indicates the addition of a new node
 #define CAN_SYNC (uint8_t) 's' // message to synchronize the nodes
 #define CAN_ACK (uint8_t) 'k' // acknowledge
-
+#define CAN_D_ELEMENT (uint8_t) 'd' //command to send element of local solution
 //union to pack/unpack long ints into bytes
 union my_can_msg {
    float value;
@@ -37,6 +37,7 @@ namespace comms {
     MCP2515::ERROR write(uint32_t id, uint8_t bytes[], uint8_t n_bytes);
     void serial_respond(char cmd, uint8_t id, float val);
     void serial_respond(char cmd, uint8_t id, int val);
+    float get_float();
 
 }
 #endif

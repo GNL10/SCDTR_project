@@ -4,20 +4,23 @@
 
 Consensus::Consensus(int node_idx, float des_lux, float res_lux, float* gains, float cost, int n_nodes){
 
-rho = 0.07;
+    rho = 0.07;
 
-len = n_nodes;
-idx = node_idx; 
-L = des_lux; 
-o = res_lux;
-d[0] = 0; d[1] = 0;
-d_av[0] = 0; d_av[1] = 0;
-y[0] = 0; y[1] = 0;
-k[0] = gains[0]; k[1] = gains[1];
-n = pow(norm(k), 2);
-m = n - pow(k[idx], 2);
-c[0] = 0; c[1] = 0;
-c[idx] = cost;
+    len = n_nodes;
+    idx = node_idx; 
+    L = des_lux; 
+    o = res_lux;
+    d[0] = 0; d[1] = 0;
+    d_av[0] = 0; d_av[1] = 0;
+    y[0] = 0; y[1] = 0;
+    k[0] = gains[0]; k[1] = gains[1];
+    n = pow(norm(k), 2);
+    m = n - pow(k[idx], 2);
+    c[0] = 0; c[1] = 0;
+    c[idx] = cost;
+
+    curr_state = State::iterate;
+    prev_av[0] = 100; prev_av[1] = 100;
 
 }
 
@@ -201,5 +204,60 @@ void Consensus::compute_y(float* d){
     op::sum(y, res, len, y);
 }
 
+bool Consensus::process_msg_received(uint8_t i, float d){ 
+    d_av[i] += d; 
+    if(i == len - 1){
+        d_av[i] = d_av[i]/len;
+        return 1;
+    }
+    return 0;    
+}
 
+bool Consensus::negotiate(can_frame frame, bool has_data){
+    float res[2];
+
+    switch(curr_state){
+    case State::iterate:
+        iterate(d);
+        op::copy(d_av, d, len, 1);
+        for(uint8_t i = 0; i < len; i++)
+            comms::can_bus_send_response(CAN_BROADCAST_ID, CAN_D_ELEMENT, i, d[i]);
+        for(uint8_t i = 0; i < len; i++)
+            comms::can_bus_send_response(CAN_BROADCAST_ID, CAN_D_ELEMENT, i, d[i]);
+        curr_state = State::wait_for_d;
+        break;
+    case State::wait_for_d:
+        Serial.println("wait_for_d");
+        if (has_data && process_msg_received(frame.data[2], comms::get_float())){
+            Serial.print("d_av: ");
+            Serial.println(d_av[0]);
+            compute_y(d);
+            op::sub(d_av, prev_av, len, res);
+            if (norm(res) < 0.001)
+                return 1;
+            op::copy(prev_av, d_av, len, 1);
+            curr_state = State::iterate;
+        }
+        break;
+    }
+    return 0;
+
+}
+
+//switch(neg_state)
+//case consensus_it:
+//  iterate(d);
+//  d_av = 0; d_av = d;
+//  sends d's
+//  neg_state = wait_for_d
+//case wait_for_d:
+//  if has_data
+//      process d (d_av += d_av)
+//  if has all the d's
+//      update d_av (d_av/n_nodes), y
+//      if (d_av - prev_av) < 0.001
+//          return 1;
+//      prev_av = d_av;
+//      neg_state = consensus_it
+//return 0;
 

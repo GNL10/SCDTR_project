@@ -101,6 +101,15 @@ bool comms::broadcast (uint8_t id, uint8_t code) { //make it general
     return true;
 }
 
+float comms::get_float(){
+    my_can_msg msg;
+
+    for (int i = 2; i < 6; i++)  // prepare can message
+        msg.bytes[i - 2] = frame.data[i];
+
+    return msg.value;
+}
+
 void comms::print_msg () {
 
     Serial.print("\t\tReceiving : cmd : "); Serial.print((char)frame.data[0]);

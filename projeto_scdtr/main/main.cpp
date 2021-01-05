@@ -37,6 +37,24 @@ Simulator *sim;
 Controller *ctrl;
 Consensus *consensus;
 
+// case 1
+int L1 = 150, o1 = 30, L2 = 80, o2 = 0;
+// case 2
+//int L1 = 80, o1 = 50, L2 = 150, o2 = 50;
+// case 3
+//int L1 = 80, o1 = 50, L2 = 270, o2 = 50;
+
+// symmetric costs
+//int cost_1 = 1, cost_2 = 1;
+// asymmetric costs
+int cost_1 = 1, cost_2 = 3;
+
+float k11 = 2, k12 = 1;
+float k21 = 1, k22 = 2;
+float gains1[] {k11, k12};
+float gains2[] {k21, k22};
+
+
 volatile bool flag = true;
 unsigned long last_state_change{0};
 volatile bool wait_event;
@@ -141,8 +159,14 @@ void loop() {
             break;
 
         case State::calibrate:
-            if (utils->calibrate(has_data, frame) == true)  // if calibration is over
-                curr_state = State::apply_control;
+            if (utils->calibrate(has_data, frame) == true){
+                if(utils->my_id == utils->lowest_id)
+                    consensus = new Consensus(utils->find_id(utils->my_id), L1, o1, gains1, cost_1, utils->id_ctr);
+                else 
+                    consensus = new Consensus(utils->find_id(utils->my_id), L2, o2, gains2, cost_2, utils->id_ctr);
+                curr_state = State::negotiate;
+
+            }  // if calibration is over
             break;
 
         case State::apply_control:
@@ -177,7 +201,7 @@ void loop() {
             }
             break;
         case State::negotiate:
-            if (negotiate()) {
+            if (consensus->negotiate(frame, has_data)) {
                 curr_state = State::end;
             }
             break;
@@ -188,29 +212,32 @@ void loop() {
     }
 }
 
-bool negotiate() {
+/*bool negotiate() {
     float d[utils->id_ctr];
+    int my_idx = utils->find_id(utils->my_id), i = 0;
 
-    if (utils->my_id == utils->lowest_id && step == 0) {
+    if (utils->my_id == utils->lowest_id && ) {
         consensus->iterate(d);
-
-        comms::send_control_msg(utils->id_vec[1], utils->my_id, 'u', 0.5);
+        for(int node = 0; node < utils->id_ctr; node++)
+            comms::can_bus_send_response(utils->id_vec[++i], 'd', node, d[node]);
         step = 1;
     }
     if (has_data) {
         comms::print_msg();
         Serial.println("Calculating u");
-        my_can_msg rcv_u;
-        for (int i = 2; i < 6; i++)  // prepare can message
-            rcv_u.bytes[i - 2] = frame.data[i];
-        Serial.print("float received: ");
-        Serial.println(rcv_u.value);
+
+        
         comms::send_control_msg(utils->id_vec[1], utils->my_id, 'u', 0.5);
         return true;
+
+        //if(frame.data[0] == 'd')
+        //get_float();
+        //  consensus->process_msg_received(frame.data[1]);
     }
 
     return false;
-}
+}*/
+
 
 void read_events() {
     if(utils->hub) {
