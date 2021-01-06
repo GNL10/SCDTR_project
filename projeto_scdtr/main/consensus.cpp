@@ -4,20 +4,23 @@
 
 Consensus::Consensus(int node_idx, float des_lux, float res_lux, float* gains, float cost, int n_nodes){
 
-rho = 0.07;
+    rho = 0.07;
 
-len = n_nodes;
-idx = node_idx; 
-L = des_lux; 
-o = res_lux;
-d[0] = 0; d[1] = 0;
-d_av[0] = 0; d_av[1] = 0;
-y[0] = 0; y[1] = 0;
-k[0] = gains[0]; k[1] = gains[1];
-n = pow(norm(k), 2);
-m = n - pow(k[idx], 2);
-c[0] = 0; c[1] = 0;
-c[idx] = cost;
+    len = n_nodes;
+    idx = node_idx; 
+    L = des_lux; 
+    o = res_lux;
+    d[0] = 0; d[1] = 0;
+    d_av[0] = 0; d_av[1] = 0;
+    y[0] = 0; y[1] = 0;
+    k[0] = gains[0]; k[1] = gains[1];
+    n = pow(norm(k), 2);
+    m = n - pow(k[idx], 2);
+    c[0] = 0; c[1] = 0;
+    c[idx] = cost;
+    memset(d_aux, 0, sizeof(d_aux));
+    curr_state = State::iterate;
+    prev_av[0] = 100; prev_av[1] = 100;
 
 }
 
@@ -201,5 +204,73 @@ void Consensus::compute_y(float* d){
     op::sum(y, res, len, y);
 }
 
+bool Consensus::process_msg_received(uint8_t i, float _d){ 
+    Serial.print("process_msg_received. i : ");
+    Serial.print(i); 
+    Serial.print("  d : ");
+    Serial.println(_d);
+    d_aux[i] += _d; 
+    Serial.print("d_aux: ");
+    Serial.println(d_aux[0]);
+    Serial.println(d_aux[1]);
+    if(i == len - 1){
+        op::sum(d_aux, d, len, d_av);
+        Serial.println(d_av[0]);
+        Serial.println(d_av[1]);
+        op::scalar_mul((float)1/len, d_av, 1, len, d_av); // calculating average
+        Serial.println(d_av[0]);
+        Serial.println(d_av[1]);
+        return 1;
+    }
+    return 0;    
+}
 
+bool Consensus::negotiate(can_frame frame, bool has_data, uint8_t my_id){
+    float res[2];
+    bool recvd_all_ds = false;
+    if (has_data && ((frame.can_id & CAN_D_ELEMENT) == CAN_D_ELEMENT)){ // compare the bit, and see if it is on
+        recvd_all_ds = process_msg_received(frame.can_id & CAN_D_ELEMENT_MASK, comms::get_float());
+    }
+    switch(curr_state){
+    case State::iterate:
+        iterate(d);
+        for(uint8_t i = 0; i < len; i++) // sending d's to every other node
+            comms::can_bus_send_response(CAN_BROADCAST_ID, my_id, CAN_D_ELEMENT | i, d[i]);
+        curr_state = State::wait_for_d;
+        break;
+    case State::wait_for_d:
+        //Serial.print("wait_for_d, has_data : ");
+        //Serial.println(has_data);
+        if (recvd_all_ds){
+            Serial.print("d_av: ");
+            Serial.println(d_av[0]);
+            compute_y(d);
+            op::sub(d_av, prev_av, len, res);
+            if (norm(res) < 0.001)
+                return 1;
+            op::copy(prev_av, d_av, len, 1);
+            curr_state = State::iterate;
+        }
+        break;
+    }
+    return 0;
+
+}
+
+//switch(neg_state)
+//case consensus_it:
+//  iterate(d);
+//  d_av = 0; d_av = d;
+//  sends d's
+//  neg_state = wait_for_d
+//case wait_for_d:
+//  if has_data
+//      process d (d_av += d_av)
+//  if has all the d's
+//      update d_av (d_av/n_nodes), y
+//      if (d_av - prev_av) < 0.001
+//          return 1;
+//      prev_av = d_av;
+//      neg_state = consensus_it
+//return 0;
 

@@ -25,31 +25,36 @@ const float error_margin = 0.5;//0.20;    // Margin of error to be ignored
 
 #define CAN_BROADCAST_ID (uint8_t) 3
 
-#define CAN_NEW_ID (uint8_t) 0
-#define CAN_ACK (uint8_t) 1
-#define CAN_SYNC (uint8_t) 2
-#define CAN_GET_ILLUM (uint8_t) 3
-#define CAN_GET_DUTY_CYCLE (uint8_t) 4
-#define CAN_GET_OCCUPANCY (uint8_t) 5
-#define CAN_GET_OCCUPIED_ILLUM (uint8_t) 6
-#define CAN_GET_UNOCCUPIED_ILLUM (uint8_t) 7
-#define CAN_GET_ILLUM_LB (uint8_t) 8 // lower bound
-#define CAN_GET_EXT_ILLUM (uint8_t) 9
-#define CAN_GET_CONTROL_REF (uint8_t) 10
-#define CAN_GET_ENERGY_COST (uint8_t) 11
-#define CAN_GET_POWER_CONSUMPTION (uint8_t) 12
-#define CAN_GET_POWER_CONSUMPTION_TOTAL (uint8_t) 13
-#define CAN_GET_TIME (uint8_t) 14
-#define CAN_GET_ACCUM_ENERGY (uint8_t) 15
-#define CAN_GET_VISIBILITY_ERR (uint8_t) 16
-#define CAN_GET_VISIBILITY_ERR_TOTAL (uint8_t) 17
-#define CAN_GET_FLICKER_ERR (uint8_t) 18
-#define CAN_GET_FLICKER_ERR_TOTAL (uint8_t) 19
-#define CAN_MEAS_RESIDUAL_LUX (uint8_t) 20
-#define CAN_MEAS_LUX (uint8_t) 21
-#define CAN_LIGHT_ON (uint8_t) 22
-#define CAN_LIGHT_OFF (uint8_t) 23
-#define CAN_CALIB_COMPLETE (uint8_t) 24
+// 7 BITS FOR THESE CAN IDS!
+// The 7th bit (msb) can only be 1 if the message is of type can_d_element, and the lesser significant bits
+// will indicate the position to which the element refers to
+#define CAN_NEW_ID (uint8_t) 0x00
+#define CAN_ACK (uint8_t) 0x01
+#define CAN_SYNC (uint8_t) 0x02
+#define CAN_GET_ILLUM (uint8_t) 0x03
+#define CAN_GET_DUTY_CYCLE (uint8_t) 0x04
+#define CAN_GET_OCCUPANCY (uint8_t) 0x05
+#define CAN_GET_OCCUPIED_ILLUM (uint8_t) 0x06
+#define CAN_GET_UNOCCUPIED_ILLUM (uint8_t) 0x07
+#define CAN_GET_ILLUM_LB (uint8_t) 0x08 // lower bound
+#define CAN_GET_EXT_ILLUM (uint8_t) 0x09
+#define CAN_GET_CONTROL_REF (uint8_t) 0x0A
+#define CAN_GET_ENERGY_COST (uint8_t) 0x0B
+#define CAN_GET_POWER_CONSUMPTION (uint8_t) 0x0C
+#define CAN_GET_POWER_CONSUMPTION_TOTAL (uint8_t) 0x0D
+#define CAN_GET_TIME (uint8_t) 0x0E
+#define CAN_GET_ACCUM_ENERGY (uint8_t) 0x0F
+#define CAN_GET_VISIBILITY_ERR (uint8_t) 0x10
+#define CAN_GET_VISIBILITY_ERR_TOTAL (uint8_t) 0x11
+#define CAN_GET_FLICKER_ERR (uint8_t) 0x12
+#define CAN_GET_FLICKER_ERR_TOTAL (uint8_t) 0x13
+#define CAN_MEAS_RESIDUAL_LUX (uint8_t) 0x14
+#define CAN_MEAS_LUX (uint8_t) 0x15
+#define CAN_LIGHT_ON (uint8_t) 0x16
+#define CAN_LIGHT_OFF (uint8_t) 0x17
+#define CAN_CALIB_COMPLETE (uint8_t) 0x18
+#define CAN_D_ELEMENT (uint8_t) 0x40 //0100 0000 command to send element of local solution
+#define CAN_D_ELEMENT_MASK (uint8_t) 0x3F
 
 
 /* COMMANDS */

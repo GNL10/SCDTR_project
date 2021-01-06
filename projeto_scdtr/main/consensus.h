@@ -1,6 +1,8 @@
 #ifndef CONSENSUS_H
 #define CONSENSUS_H
 
+#include "comms.h"
+
 class Consensus
 {
 private:
@@ -10,6 +12,8 @@ public:
     int idx;
     float d[2];
     float d_av[2];
+    float prev_av[2];
+    float d_aux[2];
     float y[2];
     float k[2];
     float n;
@@ -18,6 +22,14 @@ public:
     float o;
     float L;
     int len;
+    
+
+    enum class State : byte {
+      iterate,
+      wait_for_d
+    };
+
+    State curr_state;
 
   Consensus(int node_idx, float des_lux, float res_lux, float* gains, float cost, int n_nodes);
   void evaluate_cost(float* d, float* cost);
@@ -31,6 +43,7 @@ public:
   void compute_avg(float* d1, float* d2);
   void compute_y(float* d);
   float norm(float* v);
+  bool process_msg_received(uint8_t i, float d);
+  bool negotiate(can_frame frame, bool has_data, uint8_t my_id);
 };
-
 #endif

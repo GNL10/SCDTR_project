@@ -43,27 +43,20 @@ void comms::forward_can_to_serial(char msg[]){
     }
 }
 
-/*
-void comms::can_bus_send_response(uint8_t id, char cmd1, uint8_t own_id, float val){
-	char can_msg[CAN_MAX_DLEN];
+void comms::can_bus_send_response(uint8_t to_id, uint8_t my_id, uint8_t cmd, float val){
+	uint8_t can_msg[CAN_MAX_DLEN];
 	float_byte f;
+    f.val = val;
 
-    sprintf(can_msg, "%c %c ", cmd1, (char) own_id);
-	
-	f.val = val;
-	for(int i = 0; i < 4; i++)
-		can_msg[4+i] = f.bytes[i];
+    for(size_t i = 0; i < sizeof(float); i++)
+        can_msg[i] = f.bytes[i];
 
-	Serial.print("CANBUS SENDING : ");
-	for(int i = 0; i < 8; i++) {
-		Serial.print((uint8_t) can_msg[i]);
-		Serial.print(SPACE);
-	}
-	Serial.print("\tto id : ");
-	Serial.println(id);
-	if (write(id, (uint8_t *) can_msg, 8) != MCP2515::ERROR_OK)  // respond to id who asked
+    if (write(to_id, my_id, cmd, can_msg, sizeof(float)) != MCP2515::ERROR_OK)  // respond to id who asked
 		Serial.println(TX_BUF_FULL_ERR);
 }
+
+/*
+
 
 void comms::can_bus_send_cmd(uint8_t id, char cmd1, char cmd2, uint8_t own_id){
     char msg[CAN_MAX_DLEN];
@@ -99,6 +92,14 @@ bool comms::broadcast (uint8_t id, uint8_t cmd) { //make it general
     if(write( CAN_BROADCAST_ID, id, cmd) != MCP2515::ERROR_OK )
         return false;
     return true;
+}
+
+float comms::get_float(){
+    float_byte msg;
+
+    for (int i = 0; i < 4; i++)  // prepare can message
+        msg.bytes[i] = frame.data[i];
+    return msg.val;
 }
 
 void comms::print_msg () {

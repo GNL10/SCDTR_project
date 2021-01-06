@@ -9,7 +9,6 @@
 #define WAIT_ID_TIME (unsigned long) 3000000
 #define  WAIT_ACK_TIME (unsigned long) 100000000
 
-
 //union to pack/unpack floats into bytes
 typedef union{
     float val;
@@ -21,6 +20,7 @@ namespace comms {
     //void can_bus_send_response(uint8_t id, char cmd1, uint8_t own_id, float val);
     //void can_bus_send_cmd(uint8_t id, char cmd1, char cmd2, uint8_t own_id);
     //bool send_msg (uint8_t id, uint8_t my_id, uint8_t code);
+    void can_bus_send_response(uint8_t to_id, uint8_t my_id, uint8_t cmd, float val);
     bool send_msg (uint8_t to_id, uint8_t my_id, uint8_t cmd);
     bool broadcast (uint8_t id, uint8_t code);
     //bool wait_for_acks (uint8_t N_nodes);
@@ -34,5 +34,7 @@ namespace comms {
     uint8_t get_cmd(uint32_t id);
     uint8_t extract_uint8_t(char input[], uint8_t &idx);
     float extract_float(char input[], uint8_t &idx);
+    float get_float();
+
 }
 #endif
