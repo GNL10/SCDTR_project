@@ -3,6 +3,8 @@
 
 #include "comms.h"
 
+#define NORM_THRESHOLD 0.02
+
 class Consensus
 {
 private:
@@ -21,7 +23,7 @@ public:
     float c[2];
     float o;
     float L;
-    int len;
+    uint8_t len;
     
 
     enum class State : byte {
@@ -31,7 +33,7 @@ public:
 
     State curr_state;
 
-  Consensus(int node_idx, float des_lux, float res_lux, float* gains, float cost, int n_nodes);
+  Consensus(int node_idx, float des_lux, float res_lux, float* gains, float cost, uint8_t n_nodes);
   void evaluate_cost(float* d, float* cost);
   bool check_feasibility(float* d);
   void iterate(float* d_best);
@@ -45,5 +47,6 @@ public:
   float norm(float* v);
   bool process_msg_received(uint8_t i, float d);
   bool negotiate(can_frame frame, bool has_data, uint8_t my_id);
+  bool check_threshold(float res[], uint8_t len);
 };
 #endif

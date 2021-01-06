@@ -46,9 +46,9 @@ int L1 = 150, o1 = 30, L2 = 80, o2 = 0;
 //int L1 = 80, o1 = 50, L2 = 270, o2 = 50;
 
 // symmetric costs
-//int cost_1 = 1, cost_2 = 1;
+int cost_1 = 1, cost_2 = 1;
 // asymmetric costs
-int cost_1 = 1, cost_2 = 3;
+//int cost_1 = 1, cost_2 = 3;
 
 float k11 = 2, k12 = 1;
 float k21 = 1, k22 = 2;

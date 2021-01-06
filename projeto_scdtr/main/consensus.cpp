@@ -2,7 +2,7 @@
 #include "op.h"
 #include <math.h>
 
-Consensus::Consensus(int node_idx, float des_lux, float res_lux, float* gains, float cost, int n_nodes){
+Consensus::Consensus(int node_idx, float des_lux, float res_lux, float* gains, float cost, uint8_t n_nodes){
 
     rho = 0.07;
 
@@ -59,8 +59,6 @@ void Consensus::iterate(float* d_best){
     
     // Compute unconstrained minimum  
     op::scalar_mul(1/rho, z, len, 1, d_u);
-    /*cout << "d_u: " << d_u[0] << endl;
-    cout << "d_u: " << d_u[1] << endl;*/
     isfeasible = check_feasibility(d_u);
     if(isfeasible){
         evaluate_cost(d_u, &cost);
@@ -74,8 +72,6 @@ void Consensus::iterate(float* d_best){
         
         // Compute minimum constrained to linear boundary
         compute_d_bl(z, d_bl);
-        /*cout << "d_bl: " << d_bl[0] << endl;
-        cout << "d_bl: " << d_bl[1] << endl;*/
         isfeasible = check_feasibility(d_bl);
         if(isfeasible){
             evaluate_cost(d_bl, &cost);
@@ -86,8 +82,6 @@ void Consensus::iterate(float* d_best){
         }
         // Compute minimum constrained to 0 boundary
         compute_d_b0(z, d_b0);
-        /*cout << "d_b0: " << d_b0[0] << endl;
-        cout << "d_b0: " << d_b0[1] << endl;*/
         isfeasible = check_feasibility(d_b0);
         if(isfeasible){
             evaluate_cost(d_b0, &cost);
@@ -98,8 +92,6 @@ void Consensus::iterate(float* d_best){
         }
         // Compute minimum constrained to 100 boundary
         compute_d_b100(z, d_b100);
-        /*cout << "d_b100: " << d_b100[0] << endl;
-        cout << "d_b100: " << d_b100[1] << endl;*/
         isfeasible = check_feasibility(d_b100);
         if(isfeasible){
             evaluate_cost(d_b100, &cost);
@@ -110,8 +102,6 @@ void Consensus::iterate(float* d_best){
         }
         // Compute minimum constrained to linear and 0 boundary
         compute_d_l0(z, d_l0);
-        /*cout << "d_bl0: " << d_l0[0] << endl;
-        cout << "d_bl0: " << d_l0[1] << endl;*/
         isfeasible = check_feasibility(d_l0);
         if(isfeasible){
             evaluate_cost(d_l0, &cost);
@@ -122,8 +112,6 @@ void Consensus::iterate(float* d_best){
         }
         // Compute minimum constrained to linear and 100 boundary
         compute_d_l100(z, d_l100);
-        /*cout << "d_l100: " << d_l100[0] << endl;
-        cout << "d_l100: " << d_l100[1] << endl;*/
         isfeasible = check_feasibility(d_l100);
         if(isfeasible){
             evaluate_cost(d_l100, &cost);
@@ -133,6 +121,7 @@ void Consensus::iterate(float* d_best){
             }
         }        
     }
+    Serial.print("COST : ");Serial.println(cost_best);
 
 }
 
@@ -210,16 +199,12 @@ bool Consensus::process_msg_received(uint8_t i, float _d){
     Serial.print("  d : ");
     Serial.println(_d);
     d_aux[i] += _d; 
-    Serial.print("d_aux: ");
-    Serial.println(d_aux[0]);
-    Serial.println(d_aux[1]);
     if(i == len - 1){
         op::sum(d_aux, d, len, d_av);
-        Serial.println(d_av[0]);
-        Serial.println(d_av[1]);
         op::scalar_mul((float)1/len, d_av, 1, len, d_av); // calculating average
-        Serial.println(d_av[0]);
-        Serial.println(d_av[1]);
+        memset(d_aux, 0, sizeof(d_aux)); // reset d aux matrix
+        Serial.print("d_av[0]"); Serial.println(d_av[0]);
+        Serial.print("d_av[1]"); Serial.println(d_av[1]);
         return 1;
     }
     return 0;    
@@ -239,14 +224,10 @@ bool Consensus::negotiate(can_frame frame, bool has_data, uint8_t my_id){
         curr_state = State::wait_for_d;
         break;
     case State::wait_for_d:
-        //Serial.print("wait_for_d, has_data : ");
-        //Serial.println(has_data);
         if (recvd_all_ds){
-            Serial.print("d_av: ");
-            Serial.println(d_av[0]);
             compute_y(d);
             op::sub(d_av, prev_av, len, res);
-            if (norm(res) < 0.001)
+            if (norm(res) < NORM_THRESHOLD)
                 return 1;
             op::copy(prev_av, d_av, len, 1);
             curr_state = State::iterate;
@@ -257,20 +238,10 @@ bool Consensus::negotiate(can_frame frame, bool has_data, uint8_t my_id){
 
 }
 
-//switch(neg_state)
-//case consensus_it:
-//  iterate(d);
-//  d_av = 0; d_av = d;
-//  sends d's
-//  neg_state = wait_for_d
-//case wait_for_d:
-//  if has_data
-//      process d (d_av += d_av)
-//  if has all the d's
-//      update d_av (d_av/n_nodes), y
-//      if (d_av - prev_av) < 0.001
-//          return 1;
-//      prev_av = d_av;
-//      neg_state = consensus_it
-//return 0;
-
+bool Consensus::check_threshold(float res[], uint8_t len) {
+    for(uint8_t i = 0; i < len; i++) {
+        if ( res[i] > NORM_THRESHOLD)
+            return 0; // if one is over the threshold, then iterate more
+    }
+    return 1; // if not, stop
+}
