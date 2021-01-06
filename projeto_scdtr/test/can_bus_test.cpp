@@ -1,8 +1,14 @@
 #include <SPI.h>
 #include <EEPROM.h>
-#include "mcp2515.h"
+#include <mcp2515.h>
 
 MCP2515 mcp2515(10); //SS pin 10
+
+void load_EEPROM_vars();
+// variables saved in EEPROM
+byte ID;
+float C1, m, b; 
+
 
 class can_frame_stream {
         //10 slots buffer - increase if needed
@@ -79,8 +85,10 @@ MCP2515::ERROR write(uint32_t id, uint32_t val) {
     frame.can_dlc = 4;
     my_can_msg msg;
     msg.value = val; //pack data
-    for( int i = 0; i < 4; i++ ) //prepare can message
-        frame.data[i] = msg.bytes[i];
+    frame.data[0] = ID;
+    for( int i = 1; i < 4; i++ ) //prepare can message
+        frame.data[i] = msg.bytes[i-1];
+    
     //send data
     return mcp2515.sendMessage(&frame);
 }
@@ -94,27 +102,21 @@ void setup()
     SPI.usingInterrupt(0);
     mcp2515.reset();
     mcp2515.setBitrate(CAN_1000KBPS, MCP_16MHZ);
-    //mcp2515.setNormalMode();
+    mcp2515.setNormalMode();
     // use mcp2515.setLoopbackMode() for local testing
-    mcp2515.setLoopbackMode();
-    Serial.print("EEPROM length: ");
-    Serial.println(EEPROM.length());
+    //mcp2515.setLoopbackMode();
 
-    //float test = 0.0000015;
-    //EEPROM.put(0, test);
-    float rec = 0.0f;
-    EEPROM.get(0, rec);
-    Serial.print("READ FROM EEPROM: ");
-    Serial.println(rec, 10);
+    load_EEPROM_vars();
 }
 
 unsigned long counter = 0;
 void loop() {
     //send a few msgs in a burst
+    
     for( int i = 0; i < 4 ; i++ ) {
         Serial.print( "Sending: " );
         Serial.println( counter );
-        if( write( i , counter++ ) != MCP2515::ERROR_OK )
+        if( write( i, counter++) != MCP2515::ERROR_OK )
             Serial.println( "\t\t\t\tMCP2515 TX Buf Full" );
     }
 
@@ -136,9 +138,47 @@ void loop() {
             my_can_msg msg;
             for( int i = 0 ; i < 4 ; i++ )
                 msg.bytes[ i ] = frame.data[ i ];
-            Serial.print( "\t\tReceiving: " ); Serial.println( msg.value );
+            Serial.print( "\t\tReceiving: " ); 
+            Serial.print(" ID : "); 
+            Serial.print( msg.bytes[0] );
+            Serial.print(" Byte 0 : "); 
+            Serial.print( msg.bytes[1] );
+            Serial.print(" Byte 1 : "); 
+            Serial.print( msg.bytes[2] );
+            Serial.print(" Byte 2 : "); 
+            Serial.println( msg.bytes[3] );
+
             cli(); has_data = cf_stream.get( frame ); sei();
         }
     }
-    delay(1); //some time to breath
+    delay(3000); //some time to breathe
+}
+
+
+/**
+ * Loads the values from the EEPROM to the variables C1, m and b of the program
+ */
+void load_EEPROM_vars() {
+  int address = 0;
+  
+
+  EEPROM.get(address, ID);
+  address += sizeof(ID);
+  EEPROM.get(address, C1);
+  address += sizeof(C1);
+  EEPROM.get(address, m);
+  address += sizeof(m);
+  EEPROM.get(address, b);
+  address += sizeof(b);
+
+  Serial.println();
+  Serial.println("### EEPROM VALUES ###");
+  Serial.print("ID : ");
+  Serial.println(ID);
+  Serial.print("C1 : ");
+  Serial.println(C1, 7);
+  Serial.print("m : ");
+  Serial.println(m, 7);
+  Serial.print("b : ");
+  Serial.println(b, 7);
 }
