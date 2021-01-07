@@ -1,7 +1,38 @@
-#include <boost/asio.hpp>
-class SimpleSerial
+#include <unistd.h>
+#include <iostream>
+#include <list>
+
+#define RESTART_SYSTEM 'r'
+#define GET_VALUE 'g'
+#define  SET_O 'o'
+#define SET_U 'u'
+#define SET_C 'c'
+#define STREAM_ 's'
+
+typedef struct req
+{
+
+    unsigned long timestamp;
+
+    float lux;
+
+    float duty_cycle;
+
+    float lux_ref;
+
+    float c_err;
+
+    float c_var;
+
+}REQUEST;
+
+extern std::list <REQUEST> last_min_buffer;
+
+class serial_conn
 {
 public:
+    boost::asio::io_service io_context;
+    boost::system::error_code error_code;
     /**
      * Constructor.
      * \param port device name, example "/dev/ttyUSB0" or "COM4"
@@ -9,50 +40,27 @@ public:
      * \throws boost::system::system_error if cannot open the
      * serial device
      */
-    SimpleSerial(std::string port, unsigned int baud_rate)
-    : io(), serial(io,port)
+    serial_conn(string port, unsigned int baud_rate): io_context(), input_(io_context, ::dup(STDIN_FILENO))
     {
-        serial.set_option(boost::asio::serial_port_base::baud_rate(baud_rate));
+        open_port(port,baud_rate);
     }
 
-    /**
-     * Write a string to the serial device.
-     * \param s string to write
-     * \throws boost::system::system_error on failure
-     */
-    void writeString(std::string s)
-    {
-        boost::asio::write(serial,boost::asio::buffer(s.c_str(),s.size()));
-    }
+    void timer_handler(const boost::system::error_code &error_code);
+    void arduino_listener();
+    void console_listener();
+    void listener_handler(const boost::system::error_code &error_code);
+    void console_handler(const boost::system::error_code &error_code);
+    void get_values_from_system(std::string cmd);
+    void serial_conn::handle_get_values(boost::system::error_code &error);
+    void open_port(string port,int baud_rate);
 
-    /**
-     * Blocks until a line is received from the serial device.
-     * Eventual '\n' or '\r\n' characters at the end of the string are removed.
-     * \return a string containing the received line
-     * \throws boost::system::system_error on failure
-     */
-    std::string readLine()
-    {
-        //Reading data char by char, code is optimized for simplicity, not speed
-        using namespace boost;
-        char c;
-        std::string result;
-        for(;;)
-        {
-            asio::read(serial,asio::buffer(&c,1));
-            switch(c)
-            {
-                case '\r':
-                    break;
-                case '\n':
-                    return result;
-                default:
-                    result+=c;
-            }
-        }
-    }
+
+
 
 private:
-    boost::asio::io_service io;
-    boost::asio::serial_port serial;
+
+    boost::asio::serial_port serial_port;
+    boost::asio::streambuf cmd_buf {256};
+    boost::asio::streambuf console_buf {1024};
+    boost::asio::posix::stream_descriptor input_;
 };
