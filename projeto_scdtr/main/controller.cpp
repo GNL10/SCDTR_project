@@ -12,6 +12,10 @@ Controller::Controller(float _error_margin, float _K1, float _K2, bool _err_marg
     i_ant = 0;
     e_ant = 0;
     y_ant = 0;
+
+    u_max = 255;
+    u_min = 0;
+
 }
 
 /**
@@ -58,8 +62,25 @@ int Controller::apply_pwm_limits(int pwm) {
  * @param u Non saturated pwm value
  * @returns True if saturated, else false
  */
-bool Controller::anti_windup (int u_sat, int u) {
-  return (u_sat - u == 0) ? false : true; // if u_sat - u = 0 then there is no saturation
+int Controller::anti_windup (float ufb, float uff, float e, float ui) {
+  float ui_max = u_max - uff - K1*e; 
+  float ui_min = u_min - uff - K1*e;
+  float e_sat;
+
+  while(ui > ui_max || ui < ui_min){        
+    if(ui > ui_max) e_sat = ui - ui_max; // ui > ui_max -> e_sat > 0
+    if(ui < ui_min) e_sat = ui - ui_min; // ui < ui_min -> e_sat < 0
+    
+    ui = ui - (e_sat*1.01); //ui > ui_max: subtract; ui < ui_min: add
+    ufb = K1*e + ui;       
+  }
+
+  i_ant = ui;
+
+  return ufb + uff; 
+
+  //return (u_sat - u == 0) ? false : true; // if u_sat - u = 0 then there is no saturation
+
 } 
 
 /**
@@ -67,37 +88,10 @@ bool Controller::anti_windup (int u_sat, int u) {
  * @param e Error to be used in the PI
  * @returns Sum of the integrator + proportional term
  */
-float Controller::proportional_integrator (float e, float u_ff ) {
+float Controller::proportional_integrator (float e) {
   float p = K1*e;
-  float i = i_ant + K2*(e + e_ant);
-
+  i = i_ant + K2*0.5*(e + e_ant);
   //i_ant = (es==true) ? 0 : i; //if there was saturation, reset the integral to 0
-  
-  float i_max = U_MAX - u_ff - K1*e; 
-  float i_min = U_MIN - u_ff - K1*e;
-  //float e_sat;
-  
-  if(i + p + u_ff > U_MAX) i = i_max; // i > i_max -> e_sat > 0
-  if(i + p + u_ff < U_MIN) i = i_min; // i < i_min -> e_sat < 0
-  
-  /*while (i > i_max || i < i_min){ 
-  
-    if(i > i_max) e_sat = i - i_max; // i > i_max -> e_sat > 0
-    if(i < i_min) e_sat = i - i_min; // i < i_min -> e_sat < 0
-    
-    i = i - (e_sat*1.0001); //i > i_max: subtract; i < i_min: add
-  }
-  */
-  Serial.print(i_min);
-  Serial.print(", ");
-  Serial.print(i_max);
-  Serial.print(", ");
-  Serial.print(p);
-  Serial.print(", ");
-  Serial.print(i);
-  Serial.print(", ");
-  Serial.print(p+i);
-  Serial.print(", ");
   
   return p+i;
 }
@@ -111,10 +105,8 @@ float Controller::proportional_integrator (float e, float u_ff ) {
  */
 int Controller::run_controller(float y, float y_ref, float u_ff) {
   float e = calc_error(y, y_ref);
-  float u_fb = proportional_integrator(e, u_ff);
-  int u = u_fb + u_ff;
-  
-  int u_sat = apply_pwm_limits(u);
-  es = anti_windup (u_sat, u);
-  return u_sat;
+  float u_fb = proportional_integrator(e);
+  u_ff = apply_pwm_limits(u_ff);
+  int u = anti_windup (u_fb, u_ff, e, i);
+  return u;
 }

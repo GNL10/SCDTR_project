@@ -166,6 +166,7 @@ void loop() {
                 else 
                     consensus = new Consensus(utils->find_id(utils->my_id), L2, o2, gains2, cost_2, utils->id_ctr);
                 curr_state = State::negotiate;
+                Serial.println("\n\n######## CALIBRATED ########\n\n");
 
             }  // if calibration is over
             break;
@@ -199,12 +200,14 @@ void loop() {
                 if (elapsedTime > sampInterval)
                     Serial.println("ERROR: Sampling period was exceeded!");
                 flag = false;
-                curr_state = State::negotiate;
             }
             break;
         case State::negotiate:
             if (consensus->negotiate(frame, has_data, utils->my_id)) {
-                curr_state = State::end;
+                u_ff = consensus->d_av[utils->my_id];
+                t_i = micros();
+			    v_i = utils->get_voltage();
+                curr_state = State::apply_control;
             }
             break;
         case State::end:
@@ -245,7 +248,8 @@ void read_events() {
 		if (utils->serial_read_lux()) {  // command is ready to be processed
 			//process_serial_input_command(utils->serial_input, utils->serial_input_index);
 			x_ref = (occupancy == true) ? occupied_lux : unoccupied_lux;  // decides x_ref, depending if it is occupied or not
-			u_ff = (x_ref == 0) ? 0 : (x_ref - utils->o) / utils->k[utils->my_id];  // if x_ref = 0, u_ff = 0
+            //Negotiate
+            u_ff = (x_ref == 0) ? 0 : (x_ref - utils->o) / utils->k[utils->my_id];  // if x_ref = 0, u_ff = 0
 			t_i = micros();
 			v_i = utils->get_voltage();
 		}

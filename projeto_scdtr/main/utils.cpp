@@ -54,7 +54,7 @@ void Utils::load_EEPROM_vars() {
   Serial.print("Inside id_tmp, C1, m, b: ");
   Serial.print(this->my_id);
   Serial.print(", ");
-  Serial.print(C1, 6);
+  Serial.print(C1, 7);
   Serial.print(", ");
   Serial.print(m, 5);
   Serial.print(", ");
