@@ -56,15 +56,17 @@ float gains1[] {k11, k12};
 float gains2[] {k21, k22};
 
 
-volatile bool flag = true;
+volatile bool flag = true; // flag for control interrupt
 unsigned long last_state_change{0};
 volatile bool wait_event;
-volatile unsigned long timeout{4000000};
+volatile unsigned long timeout;
 
 volatile bool has_data;
 
 bool sync_recvd = false;
 bool ack_recvd = false;
+
+unsigned long start_time{0}; // time at which the arduino was turned on, or reset
 
 enum class State : byte {
     start,
@@ -92,8 +94,10 @@ bool negotiate();
 void setup() {
     Serial.begin(115200);
     utils = new Utils();
-    Serial.print("Node with ID : ");
-    Serial.println(utils->my_id);
+    Serial.println();
+    Serial.print("######## ID : ");
+    Serial.print(utils->my_id);
+    Serial.println(" ########");
 
     utils->isHub();
 
@@ -115,6 +119,7 @@ void loop() {
 
     switch (curr_state) {
         case State::start:
+            start_time = millis();
             curr_state = State::send_id_broadcast;
             break;
 
@@ -160,14 +165,14 @@ void loop() {
             break;
 
         case State::calibrate:
-            if (utils->calibrate(has_data, frame) == true){
+            if (utils->calibrate(has_data, frame) == true){ // if calibration is over
                 if(utils->my_id == utils->lowest_id)
                     consensus = new Consensus(utils->find_id(utils->my_id), L1, o1, gains1, cost_1, utils->id_ctr);
                 else 
                     consensus = new Consensus(utils->find_id(utils->my_id), L2, o2, gains2, cost_2, utils->id_ctr);
+                Serial.println("\n\n######## CALIBRATED ########\n\n");
                 curr_state = State::negotiate;
-
-            }  // if calibration is over
+            }  
             break;
 
         case State::apply_control:
@@ -204,7 +209,8 @@ void loop() {
             break;
         case State::negotiate:
             if (consensus->negotiate(frame, has_data, utils->my_id)) {
-                curr_state = State::end;
+                Serial.println("\n\n######## NEGOTIATED ########\n\n");
+                curr_state = State::apply_control;
             }
             break;
         case State::end:
@@ -214,36 +220,10 @@ void loop() {
     }
 }
 
-/*bool negotiate() {
-    float d[utils->id_ctr];
-    int my_idx = utils->find_id(utils->my_id), i = 0;
-
-    if (utils->my_id == utils->lowest_id && ) {
-        consensus->iterate(d);
-        for(int node = 0; node < utils->id_ctr; node++)
-            comms::can_bus_send_response(utils->id_vec[++i], 'd', node, d[node]);
-        step = 1;
-    }
-    if (has_data) {
-        Serial.println("Calculating u");
-
-        
-        comms::send_control_msg(utils->id_vec[1], utils->my_id, 'u', 0.5);
-        return true;
-
-        //if(frame.data[0] == 'd')
-        //get_float();
-        //  consensus->process_msg_received(frame.data[1]);
-    }
-
-    return false;
-}*/
-
-
 void read_events() {
     if(utils->hub) {
 		if (utils->serial_read_lux()) {  // command is ready to be processed
-			//process_serial_input_command(utils->serial_input, utils->serial_input_index);
+			process_serial_input_command(utils->serial_input, utils->serial_input_index);
 			x_ref = (occupancy == true) ? occupied_lux : unoccupied_lux;  // decides x_ref, depending if it is occupied or not
 			u_ff = (x_ref == 0) ? 0 : (x_ref - utils->o) / utils->k[utils->my_id];  // if x_ref = 0, u_ff = 0
 			t_i = micros();
@@ -268,6 +248,14 @@ void read_events() {
 	if(has_data){
         process_can_bus_cmd(frame);
 	}
+    /*
+    if (changed == true) {
+        x_ref = (occupancy == true) ? occupied_lux : unoccupied_lux;  // decides x_ref, depending if it is occupied or not
+        u_ff = (x_ref == 0) ? 0 : (x_ref - utils->o) / utils->k[utils->my_id];  // if x_ref = 0, u_ff = 0
+        t_i = micros();
+        v_i = utils->get_voltage();
+        //start negotiate
+    }*/
 }
 
 void irqHandler() {
@@ -301,55 +289,62 @@ void irqHandler() {
 ISR(TIMER1_COMPA_vect) {
     flag = 1;  // notify main loop
 }
-/*
-void can_bus_cmd_get(char msg[]){
-	char next_cmd = msg[2];
-	uint8_t id = msg[4];
 
-	switch (next_cmd) {
-	case CMD_ILLUM:
-		comms::can_bus_send_response(id, CMD_ILLUM, utils->my_id, utils->calc_lux());
-		break;
+void process_rtr_req(uint32_t can_id){
+	Serial.println("I RECEIVED A RTR REQUEST !!");
+	uint8_t cmd = comms::get_cmd(can_id);
+	uint8_t src_id = comms::get_src_id(can_id);
 
-	case CMD_DUTY_CYCLE:
-		comms::can_bus_send_response(id, CMD_DUTY_CYCLE, utils->my_id, (float) u_sat/255*100);
+	switch (cmd){
+	case CAN_GET_ILLUM: 
+		comms::can_bus_send_val(src_id, utils->my_id, CAN_GET_ILLUM, utils->calc_lux());
 		break;
-	
-	case CMD_OCCUPANCY:
-		comms::can_bus_send_response(id, CMD_OCCUPANCY, utils->my_id, occupancy);
+	case CAN_GET_DUTY_CYCLE:
+		comms::can_bus_send_val(src_id, utils->my_id, CAN_GET_DUTY_CYCLE, (float)u_sat/255*100);
 		break;
+	case CAN_GET_OCCUPANCY: 
+		comms::can_bus_send_val(src_id, utils->my_id, CAN_GET_OCCUPANCY, occupancy);
+		break;	
+	case CAN_GET_OCCUPIED_ILLUM: 
+		comms::can_bus_send_val(src_id, utils->my_id, CAN_GET_OCCUPIED_ILLUM, occupied_lux);
+		break;
+	case CAN_GET_UNOCCUPIED_ILLUM: 
+		comms::can_bus_send_val(src_id, utils->my_id, CAN_GET_UNOCCUPIED_ILLUM, unoccupied_lux);
+		break;
+	case CAN_GET_ILLUM_LB:  // lower bound
+		break;
+	case CAN_GET_EXT_ILLUM: 
+		break;
+	case CAN_GET_CONTROL_REF: 
+		break;
+	case CAN_GET_ENERGY_COST: 
+		break;
+	case CAN_GET_POWER_CONSUMPTION: 
+		break;
+	case CAN_GET_POWER_CONSUMPTION_TOTAL: 
+		break;
+	case CAN_GET_TIME:
+        Serial.print("TIME : "); Serial.println((millis() - start_time)/1000);
+        comms::can_bus_send_val(src_id, utils->my_id, CAN_GET_TIME, (millis() - start_time)/1000);
+		break;
+	case CAN_GET_ACCUM_ENERGY: 
+		break;
+	case CAN_GET_VISIBILITY_ERR: 
+		break;
+	case CAN_GET_VISIBILITY_ERR_TOTAL: 
+		break;
+	case CAN_GET_FLICKER_ERR: 
+		break;
+	case CAN_GET_FLICKER_ERR_TOTAL:
+		break;
+	case CAN_SET_OCCUPIED_LUX:
 
-	case CMD_OCCUPIED_ILLUM:
-        comms::can_bus_send_response(id, CMD_OCCUPIED_ILLUM, utils->my_id, occupied_lux);
-		break;
-	case CMD_UNOCCUPIED_ILLUM:
-        comms::can_bus_send_response(id, CMD_UNOCCUPIED_ILLUM, utils->my_id, unoccupied_lux);
-		break;
-
-	case CMD_ILLUM_LB:
-		break;
-	case CMD_EXT_ILLUM:
-		break;
-	case CMD_CONTROL_REF:
-		break;
-	case CMD_ENERGY_COST:
-		break;
-	case CMD_POWER_CONSUPTION:
-		break;
-	case CMD_TIME:
-		break;
-	case CMD_ACCUM_ENERGY:
-		break;
-	case CMD_VISIBILITY_ERR:
-		break;
-	case CMD_FLICKER_ERR:
-		break;
+        break;
 	default:
-		Serial.println("Invalid command!");
 		break;
 	}
 }
-*/
+
 void process_can_bus_cmd (can_frame frame){
     Serial.print("RECEIVED NEW MSG :  ID: ");
     Serial.print(frame.can_id, BIN);
@@ -357,64 +352,107 @@ void process_can_bus_cmd (can_frame frame){
     Serial.println(frame.can_id & CMD_MASK);
     
     uint8_t cmd = comms::get_cmd(frame.can_id);
+	uint8_t src_id = comms::get_src_id(frame.can_id);
+    float aux_float = 0;
+    unsigned long aux_ulong = 0;
 
-    switch (cmd){
-    case CAN_NEW_ID:
-        break;
-    case CAN_SYNC:
-        sync_recvd = true;
-        break;
-    case CAN_ACK:
-        ack_recvd = true;
-        break;
-    
-    default:
-        break;
-    }
-    /*
-    char msg[CAN_MAX_DLC + 1];
+	if (frame.can_id & CAN_RTR_FLAG)
+		process_rtr_req(frame.can_id);
 
-    Serial.print("CAN BUS RECEIVING : (byte*) ");
-    for(int i = 0; i < frame.can_dlc; i++) {
-        Serial.print(frame.data[i]);
-        Serial.print(SPACE);
-        msg[i] = frame.data[i];
-    }
-    msg[frame.can_dlc] = '\0';
-	Serial.print("\t (char*) ");
-    Serial.println(msg);
+	else {
+		if(utils->hub){
+            switch (cmd)
+            {
+            case CAN_GET_ILLUM:
+                aux_float = comms::get_float();
+                comms::serial_respond(CMD_ILLUM, src_id, aux_float);
+                break;
+            case CAN_GET_DUTY_CYCLE:
+                aux_float = comms::get_float();
+                comms::serial_respond(CMD_DUTY_CYCLE, src_id, aux_float);
+                break;
+            case CAN_GET_OCCUPANCY: 
+                aux_float = comms::get_float();
+                comms::serial_respond(CMD_OCCUPANCY, src_id, aux_float);
+                break;	
+            case CAN_GET_OCCUPIED_ILLUM: 
+                aux_float = comms::get_float();
+                comms::serial_respond(CMD_OCCUPIED_ILLUM, src_id, aux_float);
+                break;
+            case CAN_GET_UNOCCUPIED_ILLUM: 
+                aux_float = comms::get_float();
+                comms::serial_respond(CMD_UNOCCUPIED_ILLUM, src_id, aux_float);
+                break;
+            case CAN_GET_ILLUM_LB:  // lower bound
+                aux_float = comms::get_float();
+                comms::serial_respond(CMD_ILLUM_LB, src_id, aux_float);
+                break;
+		    case CAN_GET_EXT_ILLUM: 
+                aux_float = comms::get_float();
+                comms::serial_respond(CMD_EXT_ILLUM, src_id, aux_float);
+			    break;
+            case CAN_GET_CONTROL_REF: 
+                break;
+            case CAN_GET_ENERGY_COST: 
+                break;
+            case CAN_GET_POWER_CONSUMPTION: 
+                break;
+            case CAN_GET_POWER_CONSUMPTION_TOTAL: 
+                break;
+            case CAN_GET_TIME: 
+                aux_ulong = comms::get_ulong();
+                Serial.print("TIME : "); Serial.println(aux_ulong);
+                comms::serial_respond(CMD_TIME, src_id, aux_ulong);
+                break;
+            case CAN_GET_ACCUM_ENERGY: 
+                break;
+            case CAN_GET_VISIBILITY_ERR: 
+                break;
+            case CAN_GET_VISIBILITY_ERR_TOTAL: 
+                break;
+            case CAN_GET_FLICKER_ERR: 
+                break;
+            case CAN_GET_FLICKER_ERR_TOTAL:
+                break;
+            default:
+                break;
+            }
+		}
+		
+		switch (cmd){
+		case CAN_NEW_ID:
+			break;
+		case CAN_SYNC:
+			sync_recvd = true;
+			break;
+		case CAN_ACK:
+			ack_recvd = true;
+			break;
+		
+        case CAN_SET_OCCUPANCY:
+            occupancy = comms::get_bool(frame);
+            comms::send_msg(src_id, utils->my_id, CAN_ACK);
+            Serial.print("Setting occupancy to : ");
+            Serial.println(occupancy);
+            break;
+        case CAN_SET_OCCUPIED_LUX:
+            occupied_lux = comms::get_float();
+            Serial.print("Setting occupied lux to : ");
+            Serial.println(occupied_lux);
+            break;
+        case CAN_SET_UNOCCUPIED_LUX:
+            unoccupied_lux = comms::get_float();
+            Serial.print("Setting unoccupied lux to : ");
+            Serial.println(unoccupied_lux);
+            break;
 
-	char cmd = msg[0];
-	uint8_t id;
-	float_byte l;
-
-	if(utils->hub) // if node is hub
-		comms::forward_can_to_serial(msg);
-
-    switch (cmd) {
-    case CMD_GET:
-        can_bus_cmd_get(msg);
-        break;
-    case CMD_OCCUPANCY:
-        id = msg[2];
-        //get float from can bus
-        break;
-
-    case CMD_SYNC:
-        Serial.println("RECEIVED A SYNC");
-        sync_recvd = true;
-        break;
-    case CMD_ACK:
-        ack_recvd = true;
-        break;
-    default:
-        break;
-    }*/
-    
+		default:
+			break;
+		}
+	}    
 }
 
 
-/*
 void cmd_get(char serial_input[]) {		//          012345
 	char next_cmd = serial_input[2]; 	// example:<g l 12>
 	uint8_t idx = 4;
@@ -425,34 +463,34 @@ void cmd_get(char serial_input[]) {		//          012345
 		if(id == utils->my_id) // if this is the node being asked
             comms::serial_respond(CMD_ILLUM, id, utils->calc_lux());
 		else // send the msg to the node
-			comms::can_bus_send_cmd(id, CMD_GET, CMD_ILLUM, utils->my_id);
+			comms::send_msg(id, utils->my_id, CAN_GET_ILLUM, true);
 		break;
 
 	case CMD_DUTY_CYCLE:
 		if(id == utils->my_id) // if this is the node being asked
-			comms::serial_respond(CMD_DUTY_CYCLE, utils->my_id, u_sat);
+			comms::serial_respond(CMD_DUTY_CYCLE, utils->my_id, (float)u_sat/255*100);
 		else
-			comms::can_bus_send_cmd(id, CMD_GET, CMD_DUTY_CYCLE, utils->my_id);
+			comms::send_msg(id, utils->my_id, CAN_GET_DUTY_CYCLE, true);
 		break;
 	
 	case CMD_OCCUPANCY:
 		if(id == utils->my_id) // if this is the node being asked
 			comms::serial_respond(CMD_OCCUPANCY, id, (int)occupancy);
 		else
-			comms::can_bus_send_cmd(id, CMD_GET, CMD_OCCUPANCY, utils->my_id);
+			comms::send_msg(id, utils->my_id, CAN_GET_OCCUPANCY, true);
 		break;
 
 	case CMD_OCCUPIED_ILLUM:
         if(id == utils->my_id) // if this is the node being asked
             comms::serial_respond(CMD_OCCUPIED_ILLUM, id, occupied_lux);
         else
-            comms::can_bus_send_cmd(id, CMD_GET, CMD_OCCUPIED_ILLUM, utils->my_id);
+            comms::send_msg(id, utils->my_id, CAN_GET_OCCUPIED_ILLUM, true);
 		break;
 	case CMD_UNOCCUPIED_ILLUM:
         if(id == utils->my_id) // if this is the node being asked
             comms::serial_respond(CMD_UNOCCUPIED_ILLUM, id, unoccupied_lux);
         else
-            comms::can_bus_send_cmd(id, CMD_GET, CMD_UNOCCUPIED_ILLUM, utils->my_id); 
+            comms::send_msg(id, utils->my_id, CAN_GET_UNOCCUPIED_ILLUM, true);
 		break;
 	case CMD_ILLUM_LB:
 		break;
@@ -465,6 +503,10 @@ void cmd_get(char serial_input[]) {		//          012345
 	case CMD_POWER_CONSUPTION:
 		break;
 	case CMD_TIME:
+        if(id == utils->my_id) // if this is the node being asked
+            comms::serial_respond(CMD_TIME, id, (millis() - start_time)/1000);
+        else
+            comms::send_msg(id, utils->my_id, CAN_GET_TIME, true);
 		break;
 	case CMD_ACCUM_ENERGY:
 		break;
@@ -473,17 +515,14 @@ void cmd_get(char serial_input[]) {		//          012345
 	case CMD_FLICKER_ERR:
 		break;
 	default:
-		Serial.println("Invalid command!");
 		break;
 	}
 }
-*/
 
 /**
  * Processes the command entered in the serial_input variable
  * Changes occupancy and lower bound values according to command
  */
-/*
 void process_serial_input_command(char serial_input[], uint8_t &idx) {
 	char command = serial_input[0]; // first part of command
 	uint8_t id, aux_idx = 2;
@@ -501,18 +540,31 @@ void process_serial_input_command(char serial_input[], uint8_t &idx) {
             Serial.println(SERIAL_ACK);
         }
         else 
-            comms::can_bus_send_cmd(id, CMD_OCCUPANCY, utils->my_id, (serial_input[aux_idx] == '0') ? 0 : 1);
-         
+            comms::can_bus_send_val(id, utils->my_id, CAN_SET_OCCUPANCY, (serial_input[aux_idx] == '0') ? false : true);
 		break;
 	
 	case CMD_OCCUPIED_ILLUM: // Set lower bound on illuminance for Occupied state at desk <i>
         id = comms::extract_uint8_t(serial_input, aux_idx);
         val = comms::extract_float(serial_input, aux_idx);
         Serial.print("FLOAT VALUE : "); Serial.println(val);
+        if(id == utils->my_id){
+            occupied_lux = val;
+            Serial.println(SERIAL_ACK);
+        }
+        else
+            comms::can_bus_send_val(id, utils->my_id, CAN_SET_OCCUPIED_LUX, val);
 		break;
 	
 	case CMD_UNOCCUPIED_ILLUM: // Set lower bound on illuminance for Unccupied state at desk <i>
-	
+        id = comms::extract_uint8_t(serial_input, aux_idx);
+        val = comms::extract_float(serial_input, aux_idx);
+        Serial.print("FLOAT VALUE : "); Serial.println(val);
+        if(id == utils->my_id){
+            unoccupied_lux = val;
+            Serial.println(SERIAL_ACK);
+        }
+        else
+            comms::can_bus_send_val(id, utils->my_id, CAN_SET_UNOCCUPIED_LUX, val);
 		break;
 
 	case CMD_ENERGY_COST: // Set current energy cost at desk <i>
@@ -528,7 +580,8 @@ void process_serial_input_command(char serial_input[], uint8_t &idx) {
 		break;
 	}	
 	idx = 0;
-}*/
+}
+
 
 void control_interrupt_setup() {
     cli();       // disable interrupts

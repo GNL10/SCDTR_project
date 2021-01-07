@@ -22,3 +22,6 @@ Running platformio remote client on raspberry pi:
         pio remote device monitor --baud 115200 -p <PORT NAME>
 
         <PORT NAME> example : /dev/ttyACM1
+
+        raspberry bia
+        ssh -p 43000 pi@94.62.143.69

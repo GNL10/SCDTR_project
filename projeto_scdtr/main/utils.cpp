@@ -51,14 +51,14 @@ void Utils::load_EEPROM_vars() {
   address += sizeof(m);
   EEPROM.get(address, b);
   address += sizeof(b);
-  Serial.print("Inside id_tmp, C1, m, b: ");
+  /*Serial.print("Inside id, C1, m, b: ");
   Serial.print(this->my_id);
   Serial.print(", ");
   Serial.print(C1, 6);
   Serial.print(", ");
   Serial.print(m, 5);
   Serial.print(", ");
-  Serial.println(b, 5);
+  Serial.println(b, 5);*/
 }
 
 /**

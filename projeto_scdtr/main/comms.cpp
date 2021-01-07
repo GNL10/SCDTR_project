@@ -43,7 +43,7 @@ void comms::forward_can_to_serial(char msg[]){
     }
 }
 
-void comms::can_bus_send_response(uint8_t to_id, uint8_t my_id, uint8_t cmd, float val){
+void comms::can_bus_send_val(uint8_t to_id, uint8_t my_id, uint8_t cmd, float val){
 	uint8_t can_msg[CAN_MAX_DLEN];
 	float_byte f;
     f.val = val;
@@ -55,35 +55,40 @@ void comms::can_bus_send_response(uint8_t to_id, uint8_t my_id, uint8_t cmd, flo
 		Serial.println(TX_BUF_FULL_ERR);
 }
 
-/*
+void comms::can_bus_send_val(uint8_t to_id, uint8_t my_id, uint8_t cmd, int val){
+	uint8_t can_msg[CAN_MAX_DLEN];
+	int_byte f;
+    f.val = val;
 
+    for(size_t i = 0; i < sizeof(int); i++)
+        can_msg[i] = f.bytes[i];
 
-void comms::can_bus_send_cmd(uint8_t id, char cmd1, char cmd2, uint8_t own_id){
-    char msg[CAN_MAX_DLEN];
-    sprintf(msg, "%c %c %c", cmd1, cmd2, own_id); // sending id as char!!
-    Serial.print("Sending msg : "); Serial.print(msg); 
-    Serial.print("\tto node : "); Serial.println(id);
-    if (write(id, (uint8_t *) msg, strlen(msg)) != MCP2515::ERROR_OK)  // send its own id
-        Serial.println(TX_BUF_FULL_ERR);
+    if (write(to_id, my_id, cmd, can_msg, sizeof(int)) != MCP2515::ERROR_OK)  // respond to id who asked
+		Serial.println(TX_BUF_FULL_ERR);
 }
 
+void comms::can_bus_send_val(uint8_t to_id, uint8_t my_id, uint8_t cmd, unsigned long val){
+	uint8_t can_msg[CAN_MAX_DLEN];
+    u_long_byte f;
+    f.val = val;
 
-bool comms::send_control_msg(uint8_t id, uint8_t my_id, uint8_t code, float u){
-    float_byte m;
-    m.val = u;
-    uint8_t msg[6];
-    msg[0] = code;
-    msg[1] = my_id;
-    for( int i = 2; i < 6; i++ ) //prepare can message
-        msg[i] = m.bytes[i-2];
-    if(write(id, msg, sizeof(msg)) != MCP2515::ERROR_OK )
-        return false;
-    return true;
+    for(size_t i = 0; i < sizeof(unsigned long); i++)
+        can_msg[i] = f.bytes[i];
+
+    if (write(to_id, my_id, cmd, can_msg, sizeof(unsigned long)) != MCP2515::ERROR_OK)  // respond to id who asked
+		Serial.println(TX_BUF_FULL_ERR);
 }
-*/
 
-bool comms::send_msg (uint8_t to_id, uint8_t my_id, uint8_t cmd) {
-    if(write(to_id, my_id, cmd) != MCP2515::ERROR_OK )
+void comms::can_bus_send_val(uint8_t to_id, uint8_t my_id, uint8_t cmd, bool val){
+	uint8_t can_msg[CAN_MAX_DLEN];
+    can_msg[0] = val;
+
+    if (write(to_id, my_id, cmd, can_msg, sizeof(bool)) != MCP2515::ERROR_OK)  // respond to id who asked
+		Serial.println(TX_BUF_FULL_ERR);
+}
+
+bool comms::send_msg (uint8_t to_id, uint8_t my_id, uint8_t cmd, bool rtr) {
+    if(write(to_id, my_id, cmd, rtr) != MCP2515::ERROR_OK )
         return false;
     return true;
 }
@@ -98,6 +103,14 @@ float comms::get_float(){
     float_byte msg;
 
     for (int i = 0; i < 4; i++)  // prepare can message
+        msg.bytes[i] = frame.data[i];
+    return msg.val;
+}
+
+unsigned long comms::get_ulong(){
+    u_long_byte msg;
+
+    for (size_t i = 0; i < sizeof(unsigned long); i++)  // prepare can message
         msg.bytes[i] = frame.data[i];
     return msg.val;
 }
@@ -138,13 +151,15 @@ MCP2515::ERROR comms::write(uint8_t to_id, uint8_t my_id, uint8_t code, uint8_t 
 }
 
 // Send message with no data inside
-MCP2515::ERROR comms::write(uint8_t to_id, uint8_t my_id, uint8_t code) {
+MCP2515::ERROR comms::write(uint8_t to_id, uint8_t my_id, uint8_t code, bool rtr) {
 	can_frame frame;
     uint32_t id = 0;
 
     id |= (to_id & ID_MASK) << TO_SHIFT;
     id |= (my_id & ID_MASK) << FROM_SHIFT;
     id |= code & CMD_MASK; 
+    if (rtr == true)
+        id |= CAN_RTR_FLAG;
     Serial.print("SENDING MESSAGE WITH ID : ");
     Serial.println(id, BIN);
 
@@ -170,11 +185,23 @@ void comms::serial_respond(char cmd, uint8_t id, int val){
 	Serial.println(val);
 }
 
+void comms::serial_respond(char cmd, uint8_t id, unsigned long val){
+	Serial.print(cmd);
+	Serial.print(SPACE);
+	Serial.print(id);	
+	Serial.print(SPACE);
+	Serial.println(val);
+}
+
 uint8_t comms::get_src_id(uint32_t id) {
     return (id >> FROM_SHIFT) & ID_MASK;
 }
 uint8_t comms::get_cmd(uint32_t id) {
     return id & CMD_MASK;
+}
+
+bool comms::get_bool(can_frame frame){
+    return frame.data[0];
 }
 
 uint8_t comms::extract_uint8_t(char input[], uint8_t &idx) {

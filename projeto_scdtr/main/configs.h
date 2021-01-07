@@ -53,6 +53,9 @@ const float error_margin = 0.5;//0.20;    // Margin of error to be ignored
 #define CAN_LIGHT_ON (uint8_t) 0x16
 #define CAN_LIGHT_OFF (uint8_t) 0x17
 #define CAN_CALIB_COMPLETE (uint8_t) 0x18
+#define CAN_SET_OCCUPANCY (uint8_t) 0x19
+#define CAN_SET_OCCUPIED_LUX (uint8_t) 0x1A
+#define CAN_SET_UNOCCUPIED_LUX (uint8_t) 0x1B
 #define CAN_D_ELEMENT (uint8_t) 0x40 //0100 0000 command to send element of local solution
 #define CAN_D_ELEMENT_MASK (uint8_t) 0x3F
 
