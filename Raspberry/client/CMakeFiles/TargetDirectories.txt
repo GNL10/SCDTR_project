@@ -1,0 +1,3 @@
+/home/pungolini/Desktop/SCDTR/project/Raspberry/client/CMakeFiles/rebuild_cache.dir
+/home/pungolini/Desktop/SCDTR/project/Raspberry/client/CMakeFiles/client.dir
+/home/pungolini/Desktop/SCDTR/project/Raspberry/client/CMakeFiles/edit_cache.dir

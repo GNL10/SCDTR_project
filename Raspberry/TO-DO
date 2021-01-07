@@ -1,0 +1,12 @@
+CLIENT:
+    - Send
+    - Read
+
+
+SERVER:
+    - Send
+    - Read
+
+SERIAL:
+
+    - hello world
