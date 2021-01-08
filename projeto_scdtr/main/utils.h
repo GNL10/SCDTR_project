@@ -17,7 +17,7 @@ public:
   uint8_t id_vec[ID_MAX_NUM]; // id[0] is node's own id
   uint8_t my_id;
   uint8_t lowest_id;
-  float k[];
+  float k[ID_MAX_NUM];
   float o;
   float C1, m, b;
   bool hub; // true if node is a hub
