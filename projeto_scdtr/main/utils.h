@@ -6,8 +6,8 @@
 #include "can_frame_stream.h"
 
 #define HUB_WAIT_TIME (long) 1000000
-#define LED_WAIT_TIME (unsigned long) 500 
-#define MEASURE_WAIT_TIME (unsigned long ) 200
+#define LED_WAIT_TIME (unsigned long) 5000
+#define MEASURE_WAIT_TIME (unsigned long ) 2000
 
 class Utils
 {

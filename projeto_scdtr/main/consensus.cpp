@@ -219,8 +219,12 @@ bool Consensus::negotiate(can_frame frame, bool has_data, uint8_t my_id){
     switch(curr_state){
     case State::iterate:
         iterate(d);
-        for(uint8_t i = 0; i < len; i++) // sending d's to every other node
+        for(uint8_t i = 0; i < len; i++) {// sending d's to every other node
             comms::can_bus_send_val(CAN_BROADCAST_ID, my_id, CAN_D_ELEMENT | i, d[i]);
+            Serial.print("negotiate : i, len : ");
+            Serial.print(i);
+            Serial.println(len);
+        }
         curr_state = State::wait_for_d;
         break;
     case State::wait_for_d:

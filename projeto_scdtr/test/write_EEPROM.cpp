@@ -7,11 +7,10 @@ void setup(){
 
     int address = 0;
 
-    uint8_t id = 0;
-    float C1 = 0.0000015; //0.000001; //0.0000015; // Capacitor capacitance[uF]
+    uint8_t id = 1;
+    float C1 = 0.000001; //0.000001; //0.0000015; // Capacitor capacitance[uF]
     float m = -0.68424;//-0.70062; //-0.68424;
-    float b = 4.77815;//4.83251; //4.77815;
-    
+    float b = 4.74;//4.83251; //4.77815;
     // WRITING TO EEPROM
     EEPROM.put(address, id);
     address += sizeof(id);

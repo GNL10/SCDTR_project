@@ -166,10 +166,7 @@ void loop() {
 
         case State::calibrate:
             if (utils->calibrate(has_data, frame) == true){ // if calibration is over
-                if(utils->my_id == utils->lowest_id)
-                    consensus = new Consensus(utils->find_id(utils->my_id), L1, o1, gains1, cost_1, utils->id_ctr);
-                else 
-                    consensus = new Consensus(utils->find_id(utils->my_id), L2, o2, gains2, cost_2, utils->id_ctr);
+                consensus = new Consensus(utils->find_id(utils->my_id), L1, utils->o, utils->k, cost_1, utils->id_ctr);
                 Serial.println("\n\n######## CALIBRATED ########\n\n");
                 curr_state = State::negotiate;
             }  

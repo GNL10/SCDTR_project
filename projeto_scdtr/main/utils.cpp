@@ -51,14 +51,14 @@ void Utils::load_EEPROM_vars() {
   address += sizeof(m);
   EEPROM.get(address, b);
   address += sizeof(b);
-  /*Serial.print("Inside id, C1, m, b: ");
+  Serial.print("Inside id, C1, m, b: ");
   Serial.print(this->my_id);
   Serial.print(", ");
   Serial.print(C1, 7);
   Serial.print(", ");
   Serial.print(m, 5);
   Serial.print(", ");
-  Serial.println(b, 5);*/
+  Serial.println(b, 5);
 }
 
 /**
@@ -124,9 +124,10 @@ bool Utils::isHub() {
 }
 
 void Utils::calc_gain (uint8_t sender_id) {
-  int d = 255;
+  int d = 100; // in percentage
 
   int l = calc_lux(get_voltage());
+  Serial.print("CALC GAIN LUX MEAS : "); Serial.println(l);
   k[find_id(sender_id)] = (l - o)/ d;
 
   Serial.print("Gain measured: ");
@@ -220,6 +221,7 @@ bool Utils::calibrate (bool has_data, can_frame &frame) {
     if(!comms::broadcast(my_id, CAN_MEAS_RESIDUAL_LUX)) //broadcast "Measure Residual Lux"+my_id
         Serial.println(TX_BUF_FULL_ERR);
 
+    delay(LED_WAIT_TIME);
     analogWrite(LED_PIN, 255); //Light on
     delay(LED_WAIT_TIME);
 
@@ -230,6 +232,7 @@ bool Utils::calibrate (bool has_data, can_frame &frame) {
     delay(MEASURE_WAIT_TIME);
     Serial.println("Light off");
     analogWrite(LED_PIN, 0); //Light off
+    delay(LED_WAIT_TIME);
 
     for(int i = 1; i< id_ctr; i++)
     {     
