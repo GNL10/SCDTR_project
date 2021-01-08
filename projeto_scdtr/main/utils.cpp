@@ -232,7 +232,7 @@ bool Utils::calibrate (bool has_data, can_frame &frame) {
     delay(MEASURE_WAIT_TIME);
     Serial.println("Light off");
     analogWrite(LED_PIN, 0); //Light off
-    delay(LED_WAIT_TIME);
+    
 
     for(int i = 1; i< id_ctr; i++)
     {     
