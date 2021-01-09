@@ -225,20 +225,7 @@ void loop() {
                 u_ff = consensus.d_av[utils.my_id]*255/100;
                 t_i = micros();
 			    v_i = utils.get_voltage();
-                if(utils.lowest_id != utils.my_id){
-                    utils.K1 = 0.1;
-                    utils.K2 = 0.01;
-                }
-                else{
-                    utils.K1 = 1;
-                    utils.K2 = 0.2; 
-                }
-            
                 x_ref = consensus.get_desired_lux();
-
-                /*Serial.print("XREF AFTER DEAL: ");
-                Serial.println(x_ref);*/
-
                 curr_state = State::apply_control;
             }
             break;
