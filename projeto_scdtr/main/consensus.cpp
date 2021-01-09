@@ -2,6 +2,7 @@
 #include "op.h"
 #include <math.h>
 
+/*
 Consensus::Consensus(int node_idx, float des_lux, float res_lux, float* gains, float cost, uint8_t n_nodes){
 
     rho = 0.07;
@@ -10,18 +11,45 @@ Consensus::Consensus(int node_idx, float des_lux, float res_lux, float* gains, f
     idx = node_idx; 
     L = des_lux; 
     o = res_lux;
-    d[0] = 0; d[1] = 0;
-    d_av[0] = 0; d_av[1] = 0;
-    y[0] = 0; y[1] = 0;
-    k[0] = gains[0]; k[1] = gains[1];
+    for(uint8_t i = 0; i < len; i++) {
+        d[i] = 0;
+        d_av[i] = 0;
+        y[i] = 0;
+        k[i] = gains[i];
+        c[i] = 0;
+        prev_av[i] = 200;
+    }
+    
     n = pow(norm(k), 2);
     m = n - pow(k[idx], 2);
-    c[0] = 0; c[1] = 0;
     c[idx] = cost;
     memset(d_aux, 0, sizeof(d_aux));
+    d_received_ctr = 0;
     curr_state = State::iterate;
-    prev_av[0] = 100; prev_av[1] = 100;
+}*/
 
+void Consensus::init(int node_idx, float des_lux, float res_lux, float* gains, float cost, uint8_t n_nodes){
+    rho = 0.07;
+
+    len = n_nodes;
+    idx = node_idx; 
+    L = des_lux; 
+    o = res_lux;
+    for(uint8_t i = 0; i < len; i++) {
+        d[i] = 0;
+        d_av[i] = 0;
+        y[i] = 0;
+        k[i] = gains[i];
+        c[i] = 0;
+        prev_av[i] = 200;
+    }
+    
+    n = pow(norm(k), 2);
+    m = n - pow(k[idx], 2);
+    c[idx] = cost;
+    memset(d_aux, 0, sizeof(d_aux));
+    d_received_ctr = 0;
+    curr_state = State::iterate;
 }
 
 void Consensus::evaluate_cost(float* d, float* cost){
@@ -181,11 +209,6 @@ float Consensus::norm (float* v){
     return sqrt(n);
 }
 
-void Consensus::compute_avg(float* d1, float* d2){
-    op::sum(d1, d2, len, d_av);
-    op::scalar_mul(0.5, d_av, len, 1, d_av);
-}
-
 void Consensus::compute_y(float* d){
     float res[len];
     op::sub(d, d_av, len, res);
@@ -199,35 +222,44 @@ bool Consensus::process_msg_received(uint8_t i, float _d){
     Serial.print("  d : ");
     Serial.println(_d);
     d_aux[i] += _d; 
-    if(i == len - 1){
+    if(++d_received_ctr == (len - 1)*len){ // receives len msgs from all nodes, but itself
+        //Serial.print("LENGTH : "); Serial.println(len);
+        d_received_ctr = 0;
+        //Serial.print("D RECEIVED CTR = "); Serial.println(d_received_ctr);
         op::sum(d_aux, d, len, d_av);
         op::scalar_mul((float)1/len, d_av, 1, len, d_av); // calculating average
         memset(d_aux, 0, sizeof(d_aux)); // reset d aux matrix
-        Serial.print("d_av[0]"); Serial.println(d_av[0]);
-        Serial.print("d_av[1]"); Serial.println(d_av[1]);
+        for(uint8_t i = 0; i < len; i++) {
+            Serial.print("d_av[");
+            Serial.print(i);
+            Serial.print("] : ");
+            Serial.println(d_av[i]);
+        }
+        
         return 1;
     }
+    //Serial.print("D RECEIVED CTR = "); Serial.println(d_received_ctr);
     return 0;    
 }
 
 bool Consensus::negotiate(can_frame frame, bool has_data, uint8_t my_id){
     float res[2];
     bool recvd_all_ds = false;
+    Serial.println("In negotiate!");
     if (has_data && ((frame.can_id & CAN_D_ELEMENT) == CAN_D_ELEMENT)){ // compare the bit, and see if it is on
         recvd_all_ds = process_msg_received(frame.can_id & CAN_D_ELEMENT_MASK, comms::get_float());
+        //Serial.print("D RECEIVED CTR = "); Serial.println(d_received_ctr);
     }
     switch(curr_state){
     case State::iterate:
+        Serial.println("Iterating !");
         iterate(d);
-        for(uint8_t i = 0; i < len; i++) {// sending d's to every other node
+        for(uint8_t i = 0; i < len; i++)// sending d's to every other node
             comms::can_bus_send_val(CAN_BROADCAST_ID, my_id, CAN_D_ELEMENT | i, d[i]);
-            Serial.print("negotiate : i, len : ");
-            Serial.print(i);
-            Serial.println(len);
-        }
         curr_state = State::wait_for_d;
         break;
     case State::wait_for_d:
+        Serial.println("WAITING FOR ID!");
         if (recvd_all_ds){
             compute_y(d);
             op::sub(d_av, prev_av, len, res);
@@ -238,6 +270,7 @@ bool Consensus::negotiate(can_frame frame, bool has_data, uint8_t my_id){
         }
         break;
     }
+    //Serial.print("D RECEIVED CTR = "); Serial.println(d_received_ctr);
     return 0;
 
 }

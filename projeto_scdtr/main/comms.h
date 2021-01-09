@@ -6,8 +6,7 @@
 
 #define TX_BUF_FULL_ERR "\t\t\t\tMCP2515 TX Buf Full"
 
-#define WAIT_ID_TIME (unsigned long) 2000000
-#define  WAIT_ACK_TIME (unsigned long) 100000000
+#define WAIT_ID_TIME (unsigned long) 3000000
 
 //union to pack/unpack floats into bytes
 typedef union{

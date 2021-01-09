@@ -14,7 +14,7 @@ class Controller {
         float u_max;
         float u_min;
     public:
-        Controller(float _error_margin, float _K1, float _K2, bool _err_margins_en);
+        void init(float _error_margin, float _K1, float _K2, bool _err_margins_en = true);
         float calc_error (float y, float y_ref);
         float apply_error_margins (float e);
         int apply_pwm_limits(int pwm);

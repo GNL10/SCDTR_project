@@ -2,7 +2,24 @@
 #include <Arduino.h>
 
 // constructor
+/*
 Controller::Controller(float _error_margin, float _K1, float _K2, bool _err_margins_en = true) {
+    error_margin = _error_margin;
+    err_margins_en =_err_margins_en;
+    K1 = _K1;
+    K2 = _K2;
+
+    es = false; // if windup is not used, then es must always stay false and thus, not affect the controller
+    i_ant = 0;
+    e_ant = 0;
+    y_ant = 0;
+
+    u_max = 255;
+    u_min = 0;
+
+}*/
+
+void Controller::init(float _error_margin, float _K1, float _K2, bool _err_margins_en) {
     error_margin = _error_margin;
     err_margins_en =_err_margins_en;
     K1 = _K1;
@@ -71,7 +88,7 @@ int Controller::anti_windup (float ufb, float uff, float e, float ui) {
     if(ui > ui_max) e_sat = ui - ui_max; // ui > ui_max -> e_sat > 0
     if(ui < ui_min) e_sat = ui - ui_min; // ui < ui_min -> e_sat < 0
     
-    ui = ui - (e_sat*1.01); //ui > ui_max: subtract; ui < ui_min: add
+    ui = ui - (e_sat * 1.01); //ui > ui_max: subtract; ui < ui_min: add
     ufb = K1*e + ui;       
   }
 

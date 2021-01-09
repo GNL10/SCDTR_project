@@ -2,6 +2,7 @@
 #include "comms.h"
 #include <EEPROM.h>
 
+/*
 Utils::Utils(){
   id_ctr = 0;
   lowest_id = 255;
@@ -11,7 +12,18 @@ Utils::Utils(){
   ack_ctr = 0;
   sync_sent = false;
   o = 0;
-}
+}*/
+
+void Utils::init(){
+    id_ctr = 0;
+    lowest_id = 255;
+    load_EEPROM_vars();
+    hub = false;
+
+    ack_ctr = 0;
+    sync_sent = false;
+    o = 0;
+} 
 
 bool Utils::add_id(uint8_t new_id){
 
@@ -51,7 +63,11 @@ void Utils::load_EEPROM_vars() {
   address += sizeof(m);
   EEPROM.get(address, b);
   address += sizeof(b);
-  Serial.print("Inside id, C1, m, b: ");
+  EEPROM.get(address, K1);
+  address += sizeof(K1);
+  EEPROM.get(address, K2);
+  address += sizeof(K2);
+  Serial.print("Inside id, C1, m, b, K1, K2: ");
   Serial.print(this->my_id);
   Serial.print(", ");
   Serial.print(C1, 7);
@@ -59,6 +75,11 @@ void Utils::load_EEPROM_vars() {
   Serial.print(m, 5);
   Serial.print(", ");
   Serial.println(b, 5);
+  Serial.print(", ");
+  Serial.println(K1, 5);
+  //K1 = 1.2;
+  Serial.print(", ");
+  Serial.println(K2, 5);
 }
 
 /**

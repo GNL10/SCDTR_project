@@ -2,14 +2,22 @@
 #include <math.h>
 
 // constructor
+/*
 Simulator::Simulator(float _m, float _b, int _R1, float _C1, float _VCC) {
     m = _m;
     b = _b;
     R1 = _R1;
     C1 = _C1;
     VCC = _VCC;
-}
+}*/
 
+void Simulator::init(float _m, float _b, int _R1, float _C1, float _VCC) {
+    m = _m;
+    b = _b;
+    R1 = _R1;
+    C1 = _C1;
+    VCC = _VCC;
+}
 /**
  * Calculates the Resistance 2 value according to the lux value
  * @param lux Lux value used to calculate the resistance

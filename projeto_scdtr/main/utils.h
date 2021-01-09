@@ -6,8 +6,8 @@
 #include "can_frame_stream.h"
 
 #define HUB_WAIT_TIME (long) 1000000
-#define LED_WAIT_TIME (unsigned long) 5000
-#define MEASURE_WAIT_TIME (unsigned long ) 2000
+#define LED_WAIT_TIME (unsigned long) 500
+#define MEASURE_WAIT_TIME (unsigned long ) 200
 
 class Utils
 {
@@ -20,6 +20,7 @@ public:
   float k[ID_MAX_NUM];
   float o;
   float C1, m, b;
+  float K1, K2;
   bool hub; // true if node is a hub
 
   uint8_t ack_ctr;
@@ -28,7 +29,8 @@ public:
   char serial_input[SERIAL_INPUT_SIZE+1];
   uint8_t serial_input_index = 0;
 
-  Utils();
+  //Utils();
+  void init();
   bool add_id(uint8_t new_id);
   int find_id(uint8_t id);
   void load_EEPROM_vars();
