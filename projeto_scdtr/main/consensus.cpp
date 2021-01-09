@@ -149,7 +149,7 @@ void Consensus::iterate(float* d_best){
             }
         }        
     }
-    //Serial.print("COST : ");Serial.println(cost_best);
+    Serial.print("COST : ");Serial.println(cost_best);
 
 }
 
@@ -245,21 +245,21 @@ bool Consensus::process_msg_received(uint8_t i, float _d){
 bool Consensus::negotiate(can_frame frame, bool has_data, uint8_t my_id){
     float res[2];
     bool recvd_all_ds = false;
-    //Serial.println("In negotiate!");
+    Serial.println("In negotiate!");
     if (has_data && ((frame.can_id & CAN_D_ELEMENT) == CAN_D_ELEMENT)){ // compare the bit, and see if it is on
         recvd_all_ds = process_msg_received(frame.can_id & CAN_D_ELEMENT_MASK, comms::get_float());
         //Serial.print("D RECEIVED CTR = "); Serial.println(d_received_ctr);
     }
     switch(curr_state){
     case State::iterate:
-        //Serial.println("Iterating !");
+        Serial.println("Iterating !");
         iterate(d);
         for(uint8_t i = 0; i < len; i++)// sending d's to every other node
             comms::can_bus_send_val(CAN_BROADCAST_ID, my_id, CAN_D_ELEMENT | i, d[i]);
         curr_state = State::wait_for_d;
         break;
     case State::wait_for_d:
-        //Serial.println("WAITING FOR ID!");
+        Serial.println("WAITING FOR ID!");
         if (recvd_all_ds){
             compute_y(d);
             op::sub(d_av, prev_av, len, res);
