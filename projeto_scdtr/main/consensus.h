@@ -49,5 +49,6 @@ public:
   bool process_msg_received(uint8_t i, float d);
   bool negotiate(can_frame frame, bool has_data, uint8_t my_id);
   bool check_threshold(float res[], uint8_t len);
+  float get_desired_lux();
 };
 #endif

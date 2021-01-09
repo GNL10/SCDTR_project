@@ -188,6 +188,9 @@ void loop() {
 
                 unsigned long t = micros();
 
+                Serial.print("XREF AFTER DEAL: ");
+                Serial.println(x_ref);
+
                 float y_ref = sim.calc_LDR_lux(x_ref, v_i, t_i, t);
                 float y = utils.calc_lux();
 
@@ -196,13 +199,15 @@ void loop() {
 
                 // Serial.print(t); // Serial.print(", "); //Serial.print(x_ref); // Serial.print(", ");// Serial.print(y_ref);// Serial.print(", ");
                 
-                Serial.print(y);
+                /*Serial.print(y);
+                Serial.print(", ");
+                Serial.print(y_ref);
                 Serial.print(", ");
                 Serial.print(u_ff);
                 Serial.print(", ");
                 Serial.print(u_sat);
                 Serial.print(", ");
-                Serial.print(y_ref - y);
+                Serial.print(y_ref - y);*/
                 // Serial.print(", ");// Serial.print(get_voltage());
                 Serial.println();
                 
@@ -220,6 +225,20 @@ void loop() {
                 u_ff = consensus.d_av[utils.my_id]*255/100;
                 t_i = micros();
 			    v_i = utils.get_voltage();
+                if(utils.lowest_id != utils.my_id){
+                    utils.K1 = 0.1;
+                    utils.K2 = 0.01;
+                }
+                else{
+                    utils.K1 = 1;
+                    utils.K2 = 0.2; 
+                }
+            
+                x_ref = consensus.get_desired_lux();
+
+                /*Serial.print("XREF AFTER DEAL: ");
+                Serial.println(x_ref);*/
+
                 curr_state = State::apply_control;
             }
             break;
